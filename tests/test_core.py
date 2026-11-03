@@ -39,11 +39,21 @@ def test_answer_retries_when_busy(monkeypatch):
     assert "quiz" in kwargs["config"].system_instruction
 
 
-def test_detailed_answer_uses_detailed_prompt():
-    a = make_answerer([mock.Mock(text="B\nBecause Paris is the capital.")])
-    assert a.answer(Image.new("RGB", (5, 5)), detailed=True).startswith("B\n")
+@pytest.mark.parametrize("mode", ["short", "detailed", "formula", "steps"])
+def test_each_mode_uses_its_prompt(mode):
+    a = make_answerer([mock.Mock(text="v = s / t")])
+    assert a.answer(Image.new("RGB", (5, 5)), mode=mode) == "v = s / t"
     config = a._client.models.generate_content.call_args.kwargs["config"]
-    assert config.system_instruction == ai.DETAILED_PROMPT
+    assert config.system_instruction == ai.PROMPTS[mode]
+
+
+def test_every_capture_shortcut_has_a_prompt():
+    import main
+    import settings
+
+    capture_actions = {a for a in settings.ACTIONS if a.startswith("capture")}
+    assert capture_actions == set(main.CAPTURE_MODES)
+    assert set(main.CAPTURE_MODES.values()) <= set(ai.PROMPTS)
 
 
 def test_answer_raises_other_errors():

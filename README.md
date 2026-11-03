@@ -103,6 +103,8 @@ Open **Settings** any time by clicking the Dock icon, or from the app menu (**Sc
 |:--|:--|
 | `Ctrl` + `Shift` + `Q` | 📸 Read the screen and answer |
 | `Ctrl` + `Shift` + `D` | 📝 Detailed answer: the answer plus a short explanation |
+| `Ctrl` + `Shift` + `F` | 🧮 Just the formula needed to calculate it |
+| `Ctrl` + `Shift` + `G` | 🪜 Short step-by-step working, ending with the answer |
 | `Ctrl` + `Shift` + `H` | 👁️ Hide / show the answer |
 | `Ctrl` + `Shift` + `↑` | 🔠 Bigger text |
 | `Ctrl` + `Shift` + `↓` | 🔡 Smaller text |
@@ -139,6 +141,8 @@ Click **Save** and the changes apply immediately, no restart needed.
 | Open question | One short sentence |
 | More than one question on screen | One numbered line per question |
 | No question found | `?` |
+| Formula (`Ctrl` + `Shift` + `F`) | `v = s / t` (one formula per line, no numbers) |
+| Steps (`Ctrl` + `Shift` + `G`) | `1. v = s / t` · `2. v = 100 / 20 = 5` · `Answer: 5 m/s` |
 
 ---
 

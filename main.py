@@ -16,6 +16,12 @@ from hotkeys import HotkeyListener
 from overlay import Overlay
 
 IS_MAC = sys.platform == "darwin"
+CAPTURE_MODES = {  # shortcut action -> ai.PROMPTS mode
+    "capture": "short",
+    "capture_detailed": "detailed",
+    "capture_formula": "formula",
+    "capture_steps": "steps",
+}
 HIDE_DELAY_MS = 150  # let the overlay disappear before the screenshot is taken
 KEEP_ON_TOP_MS = 250  # the taskbar and other topmost windows can cover the overlay; re-raise it this often
 
@@ -118,10 +124,8 @@ class App:
         self.root.after(50, self._poll)
 
     def _handle(self, name, value):
-        if name == "capture":
-            self._capture(detailed=False)
-        elif name == "capture_detailed":
-            self._capture(detailed=True)
+        if name in CAPTURE_MODES:
+            self._capture(CAPTURE_MODES[name])
         elif name == "toggle":
             self.overlay.toggle()
         elif name == "bigger":
@@ -163,7 +167,7 @@ class App:
         self.overlay.set_text("Settings saved. " + self._status_message())
         self.overlay.set_visible(True)
 
-    def _capture(self, detailed):
+    def _capture(self, mode):
         if self.busy:
             return
         if not self.answerer:
@@ -172,17 +176,17 @@ class App:
         self.busy = True
         self.overlay.set_visible(False)
         self.root.update()
-        self.root.after(HIDE_DELAY_MS, self._grab_and_ask, detailed)
+        self.root.after(HIDE_DELAY_MS, self._grab_and_ask, mode)
 
-    def _grab_and_ask(self, detailed):
+    def _grab_and_ask(self, mode):
         image = ImageGrab.grab(all_screens=not IS_MAC)  # macOS: main display only
         self.overlay.set_text("...")
         self.overlay.set_visible(True)
-        threading.Thread(target=self._ask, args=(image, detailed), daemon=True).start()
+        threading.Thread(target=self._ask, args=(image, mode), daemon=True).start()
 
-    def _ask(self, image, detailed):
+    def _ask(self, image, mode):
         try:
-            text = self.answerer.answer(image, detailed=detailed)
+            text = self.answerer.answer(image, mode=mode)
         except Exception as e:
             text = f"Error: {str(e)[:120]}"
         self.events.put(("answer", text))

@@ -31,6 +31,31 @@ No markdown, no headings, no repeating the question. Several questions: number t
 No question found: reply only "?".
 """
 
+FORMULA_PROMPT = """You are looking at a full screenshot of a computer screen.
+Most of it is clutter (browser bars, tabs, taskbar, ads, other windows, menus). Ignore all of that.
+Find the calculation problem(s) on the screen (math, physics, chemistry, finance, etc.).
+
+Reply with only the formula(s) needed to solve it, using the problem's own symbols, in plain text
+(e.g. v = s / t, x = (-b ± sqrt(b^2 - 4ac)) / 2a). One formula per line, in the order they are used.
+Do not plug in numbers, do not solve, no explanations, no markdown, no LaTeX.
+Several problems: number them. A question that needs no formula: reply "No formula needed".
+No question found: reply only "?".
+"""
+
+STEPS_PROMPT = """You are looking at a full screenshot of a computer screen.
+Most of it is clutter (browser bars, tabs, taskbar, ads, other windows, menus). Ignore all of that.
+Find the question(s) on the screen and show, as briefly as possible, how to get the answer.
+
+- Numbered steps, each one short line: the formula, the numbers put in, the result.
+- At most 6 steps. Last line: "Answer: ..." in compact quiz form.
+- For a question that is not a calculation, give the short reasoning steps instead.
+- Plain text math only (x^2, sqrt(), *, /), no markdown, no LaTeX, no repeating the question.
+Several questions: handle each in turn, labelled 1), 2), ...
+No question found: reply only "?".
+"""
+
+PROMPTS = {"short": PROMPT, "detailed": DETAILED_PROMPT, "formula": FORMULA_PROMPT, "steps": STEPS_PROMPT}
+
 _BUSY_MARKERS = ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED")
 
 
@@ -39,12 +64,11 @@ class Answerer:
         self._client = genai.Client(api_key=api_key)
         self._model = model
         self._configs = {
-            False: types.GenerateContentConfig(system_instruction=PROMPT),
-            True: types.GenerateContentConfig(system_instruction=DETAILED_PROMPT),
+            mode: types.GenerateContentConfig(system_instruction=prompt) for mode, prompt in PROMPTS.items()
         }
 
-    def answer(self, image, detailed=False, tries=4):
-        """Return Gemini's answer for a PIL image (with a short explanation if detailed).
+    def answer(self, image, mode="short", tries=4):
+        """Return Gemini's reply for a PIL image. mode is a key of PROMPTS.
 
         Retries while the model is busy.
         """
@@ -55,7 +79,7 @@ class Answerer:
         for attempt in range(1, tries + 1):
             try:
                 resp = self._client.models.generate_content(
-                    model=self._model, contents=contents, config=self._configs[detailed]
+                    model=self._model, contents=contents, config=self._configs[mode]
                 )
                 return (resp.text or "").strip() or "?"
             except Exception as e:

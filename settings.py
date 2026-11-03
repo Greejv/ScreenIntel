@@ -21,6 +21,8 @@ KEY_URL = "https://aistudio.google.com/apikey"
 ACTIONS = {
     "capture": ("ctrl+shift+q", "Answer the question on screen"),
     "capture_detailed": ("ctrl+shift+d", "Answer with a short explanation"),
+    "capture_formula": ("ctrl+shift+f", "Just the formula to calculate it"),
+    "capture_steps": ("ctrl+shift+g", "Short step-by-step working"),
     "toggle": ("ctrl+shift+h", "Show / hide the answer"),
     "bigger": ("ctrl+shift+up", "Bigger text"),
     "smaller": ("ctrl+shift+down", "Smaller text"),
