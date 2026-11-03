@@ -73,7 +73,14 @@ A blue dot appears in the system tray (bottom-right, you may need to click `^`).
 
 1. Open the [**latest release**](https://github.com/Greejv/ScreenIntel/releases/latest) and download **`ScreenIntel-mac.zip`**.
 2. Double-click the zip, then drag **`ScreenIntel.app`** into your **Applications** folder.
-3. The first time, **right-click** `ScreenIntel.app` → **Open** → **Open**. This is needed once because the app isn't signed by Apple.
+3. Open it once. macOS will say it **can't be verified** because the app isn't signed by Apple. Click **Done** (or **Cancel**), then go to **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to ScreenIntel, then **Open Anyway** again and enter your password. You only do this once.
+   <details><summary>Alternative: one Terminal command</summary>
+
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/ScreenIntel.app
+   ```
+   This removes the "downloaded from the internet" flag, so macOS opens it without asking.
+   </details>
 4. The **Settings** window opens. Paste your API key and click **Save**.
 5. Give it two permissions in **System Settings** → **Privacy & Security**:
    - **Screen Recording** → turn on **ScreenIntel** (so it can see the question)
