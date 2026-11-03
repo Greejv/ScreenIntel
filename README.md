@@ -212,12 +212,9 @@ Run the tests with `pip install pytest && pytest tests`.
 <details>
 <summary><b>Releasing a new version (maintainers)</b></summary>
 
-Every push to `main` is tested, built for Windows and macOS, and launched once to check it starts. Pushing a version tag also publishes a GitHub Release with both downloads:
+Every push to `main` is tested, built for Windows and macOS, and launched once to check it starts.
 
-```bash
-git tag v1.0.1
-git push origin v1.0.1
-```
+To publish a new version, change the number in the `VERSION` file (for example `1.0.1`) and push to `main`. The build then creates the GitHub Release `v1.0.1` with both downloads attached. Pushing a `v*` tag works too.
 </details>
 
 ---
