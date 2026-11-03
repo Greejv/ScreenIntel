@@ -61,10 +61,10 @@ Screen Intel uses Google's Gemini AI. You need your own key. It's free and takes
 2. Move it somewhere permanent, for example a `ScreenIntel` folder in Documents.
 3. Double-click **`ScreenIntel.exe`**.
 4. If Windows shows **"Windows protected your PC"**, click **More info** → **Run anyway**. This appears because the app isn't code-signed.
-5. A box asks for your API key. **Paste it** and click **OK**.
+5. The **Settings** window opens. **Paste your API key** and click **Save**.
 6. After a few seconds you'll see **"Ready. Ctrl+Shift+Q to answer."** in the top-left corner. 🎉
 
-A blue dot appears in the system tray (bottom-right, you may need to click `^`). Right-click it to **Show / hide** or **Quit**, or press `Ctrl` + `Shift` + `X` to turn it off.
+A blue dot appears in the system tray (bottom-right, you may need to click `^`). Right-click it for **Show / hide**, **Settings...** and **Quit**, or press `Ctrl` + `Shift` + `X` to turn it off.
 
 > [!TIP]
 > **Start automatically with Windows:** press `Win` + `R`, type `shell:startup`, press Enter, and put a shortcut to `ScreenIntel.exe` in that folder.
@@ -74,13 +74,13 @@ A blue dot appears in the system tray (bottom-right, you may need to click `^`).
 1. Open the [**latest release**](https://github.com/Greejv/ScreenIntel/releases/latest) and download **`ScreenIntel-mac.zip`**.
 2. Double-click the zip, then drag **`ScreenIntel.app`** into your **Applications** folder.
 3. The first time, **right-click** `ScreenIntel.app` → **Open** → **Open**. This is needed once because the app isn't signed by Apple.
-4. Paste your API key when asked and click **OK**.
+4. The **Settings** window opens. Paste your API key and click **Save**.
 5. Give it two permissions in **System Settings** → **Privacy & Security**:
    - **Screen Recording** → turn on **ScreenIntel** (so it can see the question)
    - **Accessibility** → turn on **ScreenIntel** (so the shortcuts work)
 6. **Quit and reopen** the app so the permissions take effect.
 
-Turn it off any time with `Ctrl` + `Shift` + `X`, from the Dock icon, or with `Cmd` + `Q`.
+Open **Settings** any time by clicking the Dock icon, or from the app menu (**ScreenIntel → Settings...**, `Cmd` + `,`). Turn it off with `Ctrl` + `Shift` + `X`, from the Dock icon, or with `Cmd` + `Q`.
 
 ---
 
@@ -98,7 +98,7 @@ Turn it off any time with `Ctrl` + `Shift` + `X`, from the Dock icon, or with `C
 | `Ctrl` + `Shift` + `H` | 👁️ Hide / show the answer |
 | `Ctrl` + `Shift` + `↑` | 🔠 Bigger text |
 | `Ctrl` + `Shift` + `↓` | 🔡 Smaller text |
-| `Ctrl` + `Shift` + `R` | 🔄 Restart the app (e.g. after changing your key) |
+| `Ctrl` + `Shift` + `R` | 🔄 Restart the app |
 | `Ctrl` + `Shift` + `X` | ⏻ Turn the app off |
 
 The same shortcuts work on Mac (use `Ctrl`, not `Cmd`).
@@ -106,6 +106,18 @@ The same shortcuts work on Mac (use `Ctrl`, not `Cmd`).
 ### 🖱️ Moving the answer
 
 Click directly **on the text** and drag it wherever you like. Clicks on the empty space around the text go straight through to the window behind it. On Windows, clicking the answer never takes focus away from your quiz page.
+
+### ⚙️ Settings
+
+Open Settings from the **tray icon** (Windows) or by **clicking the Dock icon** / **ScreenIntel → Settings...** (Mac). You can change:
+
+| Setting | What it does |
+|:--|:--|
+| **Gemini API key** | Your key. Tick **Show** to check it, or click **Get a free key**. |
+| **Model** | Which Gemini model answers. Leave the default unless it stops working. |
+| **Text size** | Starting size of the answer text (4 to 72). |
+
+Click **Save** and the changes apply immediately, no restart needed.
 
 ### 📖 How to read the answers
 
@@ -124,18 +136,15 @@ Click directly **on the text** and drag it wherever you like. Clicks on the empt
 ## 🛠️ Troubleshooting
 
 <details>
-<summary><b>"No Gemini API key. Restart the app to enter one."</b></summary>
+<summary><b>"No Gemini API key. Open Settings from ..."</b></summary>
 
-You closed the key box without entering a key. Press `Ctrl` + `Shift` + `R` to restart the app and enter it.
+Open **Settings** (tray icon on Windows, Dock icon on Mac), paste your key and click **Save**.
 </details>
 
 <details>
 <summary><b>"Error: ... API key not valid"</b> or I want to change my key</summary>
 
-Delete the saved settings file, then restart the app (`Ctrl` + `Shift` + `R`) and paste the new key:
-
-- **Windows:** press `Win` + `R`, paste `%APPDATA%\ScreenIntel` and press Enter, then delete `.env`.
-- **macOS:** in Finder press `Cmd` + `Shift` + `G`, paste `~/Library/Application Support/ScreenIntel` and delete `.env`. (Press `Cmd` + `Shift` + `.` to show hidden files.)
+Open **Settings**, paste the correct key and click **Save**. Make sure you copied the whole key from <https://aistudio.google.com/apikey>.
 </details>
 
 <details>
@@ -186,11 +195,12 @@ That's normal. The single `.exe` unpacks itself on each launch.
 | Windows | `%APPDATA%\ScreenIntel\.env` |
 | macOS | `~/Library/Application Support/ScreenIntel/.env` |
 
-A `.env` file placed next to the app also works and takes priority. Available settings:
+The Settings window writes this file. You can also put a `.env` file next to the app; anything the Settings window saved takes priority over it, and environment variables beat both. Available settings:
 
 ```env
 GEMINI_API_KEY=your_key_here
 GEMINI_MODEL=gemini-3.5-flash-lite   # optional, this is the default
+FONT_SIZE=14                         # optional, 4 to 72
 ```
 </details>
 

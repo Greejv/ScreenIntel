@@ -7,18 +7,15 @@ import sys
 import threading
 import tkinter as tk
 from pathlib import Path
-from tkinter import simpledialog
 
-from dotenv import load_dotenv, set_key
 from PIL import ImageGrab
 
+import settings
 from ai import Answerer
 from hotkeys import HotkeyListener
 from overlay import Overlay
 
 IS_MAC = sys.platform == "darwin"
-DEFAULT_MODEL = "gemini-3.5-flash-lite"
-PLACEHOLDER_KEY = "paste_your_key_here"
 SHORTCUTS = {
     "ctrl+shift+q": "capture",
     "ctrl+shift+h": "toggle",
@@ -27,51 +24,20 @@ SHORTCUTS = {
     "ctrl+shift+r": "restart",
     "ctrl+shift+x": "quit",
 }
+SHORTCUT_HELP = {
+    "ctrl+shift+q": "answer the question on screen",
+    "ctrl+shift+h": "show / hide the answer",
+    "ctrl+shift+up": "bigger text",
+    "ctrl+shift+down": "smaller text",
+    "ctrl+shift+r": "restart",
+    "ctrl+shift+x": "turn off",
+}
 HIDE_DELAY_MS = 150  # let the overlay disappear before the screenshot is taken
 KEEP_ON_TOP_MS = 250  # the taskbar and other topmost windows can cover the overlay; re-raise it this often
 
 
-def app_dir():
-    """Folder of the .exe when packaged, otherwise folder of this script."""
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).parent
-    return Path(__file__).parent
-
-
-def user_config_file():
-    """Per-user settings file, where the key is saved after the first-run prompt."""
-    if IS_MAC:
-        base = Path.home() / "Library" / "Application Support"
-    else:
-        base = Path(os.getenv("APPDATA") or Path.home())
-    return base / "ScreenIntel" / ".env"
-
-
-def load_api_key(root):
-    """Key from .env next to the app, else the user config file, else ask once and save it."""
-    load_dotenv(app_dir() / ".env")
-    load_dotenv(user_config_file())
-    key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-    if key and key != PLACEHOLDER_KEY:
-        return key
-
-    key = simpledialog.askstring(
-        "Screen Intel",
-        "Paste your Gemini API key\n(free at https://aistudio.google.com/apikey):",
-        parent=root,
-    )
-    key = (key or "").strip()
-    if not key:
-        return None
-    path = user_config_file()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.touch()
-    set_key(str(path), "GEMINI_API_KEY", key)
-    return key
-
-
-def make_tray(on_toggle, on_quit):
-    """Windows tray icon. macOS has no tray here: quit from the Dock icon or Cmd+Q."""
+def make_tray(on_toggle, on_settings, on_quit):
+    """Windows tray icon. macOS has no tray here: Settings and Quit live in the app menu and Dock."""
     import pystray
     from PIL import Image, ImageDraw
 
@@ -79,6 +45,7 @@ def make_tray(on_toggle, on_quit):
     ImageDraw.Draw(img).ellipse((4, 4, 60, 60), fill=(40, 120, 255, 255))
     menu = pystray.Menu(
         pystray.MenuItem("Show / hide", on_toggle, default=True),
+        pystray.MenuItem("Settings...", on_settings),
         pystray.MenuItem("Quit", on_quit),
     )
     return pystray.Icon("ScreenIntel", img, "Screen Intel", menu)
@@ -89,14 +56,13 @@ class App:
         self.busy = False
         self.events = queue.Queue()
 
-        self.root = tk.Tk()
-        self.root.withdraw()
-        key = load_api_key(self.root)
-        self.answerer = Answerer(key, os.getenv("GEMINI_MODEL", DEFAULT_MODEL)) if key else None
-        self.root.deiconify()
+        self.settings = settings.load()
+        self.answerer = self._make_answerer()
+        self.settings_window = None
 
+        self.root = tk.Tk()
         self.root.report_callback_exception = self._on_tk_error
-        self.overlay = Overlay(self.root)
+        self.overlay = Overlay(self.root, font_size=self.settings["font_size"])
 
         self.hotkeys = HotkeyListener(
             {combo: (lambda name=name: self.events.put((name, None))) for combo, name in SHORTCUTS.items()}
@@ -107,13 +73,19 @@ class App:
         self.tray = None
         if IS_MAC:
             self.root.createcommand("tk::mac::Quit", self.quit)
+            self.root.createcommand("tk::mac::ShowPreferences", self.open_settings)  # app menu, Cmd+,
+            self.root.createcommand("tk::mac::ReopenApplication", self.open_settings)  # Dock icon click
         else:
             self.tray = make_tray(
-                lambda: self.events.put(("toggle", None)), lambda: self.events.put(("quit", None))
+                lambda: self.events.put(("toggle", None)),
+                lambda: self.events.put(("settings", None)),
+                lambda: self.events.put(("quit", None)),
             )
             self.tray.run_detached()
 
-        self.overlay.set_text(self._startup_message(key))
+        self.overlay.set_text(self._status_message())
+        if not self.answerer:
+            self.open_settings()
         self.root.after(50, self._poll)
         self.root.after(KEEP_ON_TOP_MS, self._keep_on_top)
 
@@ -121,9 +93,14 @@ class App:
         self.overlay.raise_to_top()
         self.root.after(KEEP_ON_TOP_MS, self._keep_on_top)
 
-    def _startup_message(self, key):
-        if not key:
-            return "No Gemini API key. Restart the app to enter one."
+    def _make_answerer(self):
+        key = self.settings["api_key"]
+        return Answerer(key, self.settings["model"]) if key else None
+
+    def _status_message(self):
+        if not self.answerer:
+            where = "the app menu" if IS_MAC else "the tray icon"
+            return f"No Gemini API key. Open Settings from {where}."
         if self.hotkeys.failed:
             return "Shortcut already used by another app: " + ", ".join(self.hotkeys.failed)
         return "Ready. Ctrl+Shift+Q to answer."
@@ -154,6 +131,24 @@ class App:
             self.quit()
         elif name == "restart":
             self.restart()
+        elif name == "settings":
+            self.open_settings()
+
+    def open_settings(self):
+        if self.settings_window and self.settings_window.is_open():
+            self.settings_window.focus()
+            return
+        self.settings_window = settings.SettingsWindow(
+            self.root, self.settings, self._apply_settings, SHORTCUT_HELP
+        )
+
+    def _apply_settings(self, new):
+        settings.save(new)
+        self.settings = new
+        self.answerer = self._make_answerer()
+        self.overlay.set_font_size(new["font_size"])
+        self.overlay.set_text("Settings saved. " + self._status_message())
+        self.overlay.set_visible(True)
 
     def _capture(self):
         if self.busy:

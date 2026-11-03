@@ -33,12 +33,13 @@ If you changed anything visual or platform-specific, also run the app and check 
 - [ ] `Ctrl+Shift+Up/Down` resizes the text, down to the smallest size without vanishing
 - [ ] `Ctrl+Shift+R` restarts the app (old copy gone, new one shows "Ready")
 - [ ] The text can be dragged, and clicks next to it reach the window behind
+- [ ] Settings opens (tray on Windows, Dock icon / Cmd+, on macOS), and Save applies the key and text size right away
 - [ ] Quit works: `Ctrl+Shift+X`, tray icon on Windows, Cmd+Q on macOS
 
 ## Code guidelines
 
 - **Small and plain.** The whole app is a few hundred lines; keep it that way. Standard library + the four dependencies in `requirements.txt`. Ask before adding a dependency.
-- **One job per module.** `ai.py` (Gemini), `hotkeys.py` (shortcuts), `overlay.py` (window), `main.py` (wiring). Don't let GUI code into `ai.py` or Gemini code into the GUI modules.
+- **One job per module.** `ai.py` (Gemini), `hotkeys.py` (shortcuts), `overlay.py` (answer window), `settings.py` (settings file and Settings window), `main.py` (wiring). Don't let GUI code into `ai.py` or Gemini code into the GUI modules.
 - **Threads talk through the queue.** Only the tk main thread touches tkinter; other threads put `(name, value)` on `App.events`.
 - **Platform branches** go inside the module that needs them (`if IS_MAC:`), with platform-only imports inside the branch.
 - **Readable names, short functions, comments only where the "why" isn't obvious.** Follow the existing style; `ruff` enforces the basics (line length 110).
@@ -49,7 +50,7 @@ If you changed anything visual or platform-specific, also run the app and check 
 
 - The prompt is `PROMPT` in `ai.py`. Keep answers as short as possible: that is the product.
 - When you change answer formats, update the "How to read the answers" table in `README.md`.
-- To try another model without code changes, set `GEMINI_MODEL=...` in `.env`. To change the default, edit `DEFAULT_MODEL` in `main.py` and the README.
+- To try another model without code changes, set `GEMINI_MODEL=...` in `.env`. To change the default, edit `DEFAULT_MODEL` in `settings.py` and the README.
 
 ## Commits and pull requests
 

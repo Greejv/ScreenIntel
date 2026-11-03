@@ -21,13 +21,13 @@ Run `ruff check .` and `pytest -q tests` before every commit. CI runs the same p
 ## Rules
 
 - **Keep it small.** No new frameworks, no config systems, no abstractions for a single use. Prefer editing an existing module over adding one.
-- **Keep the module boundaries** in docs/ARCHITECTURE.md: `ai.py` knows nothing about the GUI, `hotkeys.py` and `overlay.py` know nothing about Gemini, `main.py` wires them together.
+- **Keep the module boundaries** in docs/ARCHITECTURE.md: `ai.py` knows nothing about the GUI, `hotkeys.py`, `overlay.py` and `settings.py` know nothing about Gemini, `main.py` wires them together.
 - **Threads:** only the tk main thread touches tkinter. Background threads (hotkeys, Gemini call, tray) talk to it only through `App.events` (a `queue.Queue`).
 - **Platform code** lives behind `sys.platform == "darwin"` checks inside `hotkeys.py`, `overlay.py` and `main.py`. Import platform-only modules (`ctypes.windll`, `pystray`, `pynput`) lazily inside those branches so tests import cleanly on Linux.
 - **Answers must stay as short as possible.** Prompt changes go in `ai.PROMPT`; keep the per-question-type rules and update the "How to read the answers" table in README.md to match.
-- **Never commit API keys** or `.env` files. The key is read from `.env` next to the app or the per-user config file (see `main.user_config_file`).
-- **The default model** is `DEFAULT_MODEL` in `main.py`. Keep README.md and docs in sync if it changes.
-- Add or update a test in `tests/` for any change to `ai.py` or the shortcut parsing in `hotkeys.py`. GUI code is checked by the CI smoke test (the app must stay running for 15 s with `GEMINI_API_KEY` set).
+- **Never commit API keys** or `.env` files. All settings go through `settings.load()` / `settings.save()`; add new settings there and to the Settings window.
+- **The default model** is `DEFAULT_MODEL` in `settings.py`. Keep README.md and docs in sync if it changes.
+- Add or update a test in `tests/` for any change to `ai.py`, `settings.load/save`, or the shortcut parsing in `hotkeys.py`. GUI code is checked by the CI smoke test (the app must stay running for 15 s with `GEMINI_API_KEY` set).
 
 ## Releasing
 

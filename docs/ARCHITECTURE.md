@@ -19,6 +19,7 @@ Screen Intel is four small modules wired together by `main.py`.
 | `main.py` | App lifecycle: load or ask for the API key, create the overlay, start shortcuts and tray, route events, take screenshots, run the Gemini call on a worker thread. | all modules below |
 | `ai.py` | The prompt and the Gemini call. JPEG-encodes the image, retries on 503/429 with backoff, returns a stripped string (`"?"` if empty). | `google-genai`, Pillow |
 | `hotkeys.py` | Global shortcuts. `WindowsHotkeys` uses Win32 `RegisterHotKey` on its own message-loop thread (no keyboard hook, so antivirus doesn't flag it). `MacHotkeys` uses `pynput.GlobalHotKeys`. `HotkeyListener` picks one per platform. | ctypes / pynput |
+| `settings.py` | Where settings live (`load`, `save`, per-user file path) and the Settings window (API key, model, text size). Opened from the Windows tray, or the macOS app menu / Dock icon. | tkinter, python-dotenv |
 | `overlay.py` | Borderless, topmost, transparent tk window showing white text in the system UI font (Segoe UI Variable on Windows 11, SF Pro on macOS). Drag by the text, font size steps, show/hide. Windows: `WS_EX_NOACTIVATE` + `WS_EX_TOOLWINDOW`, so it never takes focus and has no taskbar button. | tkinter |
 
 ## Flow of one answer
@@ -37,14 +38,13 @@ Screen Intel is four small modules wired together by `main.py`.
 
 ## Configuration
 
-Read in this order (first found wins, environment variables beat files):
+`settings.load()` merges, highest priority first:
 
-1. Environment variables `GEMINI_API_KEY` / `GOOGLE_API_KEY`, `GEMINI_MODEL`
-2. `.env` next to the executable (or next to `main.py` when run from source)
-3. Per-user file: `%APPDATA%\ScreenIntel\.env` or `~/Library/Application Support/ScreenIntel/.env`
-4. Otherwise a dialog asks for the key and saves it to the per-user file.
+1. Environment variables `GEMINI_API_KEY` / `GOOGLE_API_KEY`, `GEMINI_MODEL`, `FONT_SIZE`
+2. Per-user file written by the Settings window: `%APPDATA%\ScreenIntel\.env` or `~/Library/Application Support/ScreenIntel/.env`
+3. `.env` next to the executable (or next to `main.py` when run from source)
 
-The placeholder value from `.env.example` is treated as "no key".
+With no key, the app starts anyway, shows a hint on the overlay and opens the Settings window. Saving applies immediately (`App._apply_settings` rebuilds the `Answerer` and resizes the text). The placeholder value from `.env.example` is treated as "no key".
 
 ## Build and release
 

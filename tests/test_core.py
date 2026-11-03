@@ -47,3 +47,25 @@ def test_answer_raises_other_errors():
 
 def test_empty_reply_becomes_question_mark():
     assert make_answerer([mock.Mock(text=None)]).answer(Image.new("RGB", (5, 5))) == "?"
+
+
+def test_settings_roundtrip(tmp_path, monkeypatch):
+    import settings
+
+    for name in ("GEMINI_API_KEY", "GOOGLE_API_KEY", "GEMINI_MODEL", "FONT_SIZE"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(settings, "app_dir", lambda: tmp_path / "app")
+    monkeypatch.setattr(settings, "user_config_file", lambda: tmp_path / "user" / ".env")
+
+    assert settings.load() == {"api_key": None, "model": settings.DEFAULT_MODEL, "font_size": 14}
+
+    (tmp_path / "app").mkdir()
+    (tmp_path / "app" / ".env").write_text("GEMINI_API_KEY=paste_your_key_here\nFONT_SIZE=999\n")
+    assert settings.load()["api_key"] is None  # placeholder means no key
+    assert settings.load()["font_size"] == settings.MAX_FONT
+
+    settings.save({"api_key": "abc", "model": "m", "font_size": 9})
+    assert settings.load() == {"api_key": "abc", "model": "m", "font_size": 9}  # settings file wins
+
+    monkeypatch.setenv("GEMINI_API_KEY", "from-env")
+    assert settings.load()["api_key"] == "from-env"  # environment wins

@@ -86,7 +86,10 @@ class Overlay:
         self.set_visible(not self.visible)
 
     def change_font(self, step):
-        self.font_size = max(MIN_FONT, min(MAX_FONT, self.font_size + step))
+        self.set_font_size(self.font_size + step)
+
+    def set_font_size(self, size):
+        self.font_size = max(MIN_FONT, min(MAX_FONT, size))
         self._redraw()
 
     def _redraw(self):
