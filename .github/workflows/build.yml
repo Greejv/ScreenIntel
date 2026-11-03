@@ -50,28 +50,44 @@ jobs:
           pyinstaller --windowed --name ScreenIntel --osx-bundle-identifier io.github.greejv.screenintel main.py
           cd dist && ditto -c -k --keepParent ScreenIntel.app ScreenIntel-mac.zip
 
-      # Start the built app with a dummy key and check it is still running after 15 s.
+      # Start the built app with a dummy key: it must still be running after 8 s, then quit by itself
+      # (SCREENINTEL_QUIT_AFTER_MS), exit with code 0 and leave no temporary files behind.
       - name: Smoke test (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         env:
           GEMINI_API_KEY: ci-dummy-key
+          SCREENINTEL_QUIT_AFTER_MS: "12000"
         run: |
+          $before = @(Get-ChildItem $env:TEMP -Directory -Filter "_MEI*" -ErrorAction SilentlyContinue).Name
           $p = Start-Process dist\ScreenIntel.exe -PassThru
-          Start-Sleep 15
+          $null = $p.Handle  # keep the handle so ExitCode is readable later
+          Start-Sleep 8
           if ($p.HasExited) { throw "App exited early with code $($p.ExitCode)" }
-          Stop-Process -Id $p.Id -Force
+          if (-not $p.WaitForExit(60000)) { Stop-Process -Id $p.Id -Force; throw "App did not quit" }
+          if ($p.ExitCode -ne 0) { throw "App exited with code $($p.ExitCode)" }
+          Start-Sleep 2
+          if (Get-Process ScreenIntel -ErrorAction SilentlyContinue) { throw "ScreenIntel process left running" }
+          $left = @(Get-ChildItem $env:TEMP -Directory -Filter "_MEI*" -ErrorAction SilentlyContinue).Name |
+            Where-Object { $_ -notin $before }
+          if ($left) { throw "Temporary folder left behind: $left" }
+          Write-Host "Clean start and shutdown."
 
       - name: Smoke test (macOS)
         if: runner.os == 'macOS'
         env:
           GEMINI_API_KEY: ci-dummy-key
+          SCREENINTEL_QUIT_AFTER_MS: "12000"
         run: |
           dist/ScreenIntel.app/Contents/MacOS/ScreenIntel &
           pid=$!
-          sleep 15
+          sleep 8
           kill -0 $pid || { echo "App exited early"; exit 1; }
-          kill $pid
+          for i in $(seq 60); do kill -0 $pid 2>/dev/null || break; sleep 1; done
+          if kill -0 $pid 2>/dev/null; then kill -9 $pid; echo "App did not quit"; exit 1; fi
+          wait $pid || { echo "App exited with an error"; exit 1; }
+          if pgrep -f ScreenIntel.app; then echo "ScreenIntel process left running"; exit 1; fi
+          echo "Clean start and shutdown."
 
       - uses: actions/upload-artifact@v4
         with:

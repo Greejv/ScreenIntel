@@ -39,6 +39,13 @@ def test_answer_retries_when_busy(monkeypatch):
     assert "quiz" in kwargs["config"].system_instruction
 
 
+def test_detailed_answer_uses_detailed_prompt():
+    a = make_answerer([mock.Mock(text="B\nBecause Paris is the capital.")])
+    assert a.answer(Image.new("RGB", (5, 5)), detailed=True).startswith("B\n")
+    config = a._client.models.generate_content.call_args.kwargs["config"]
+    assert config.system_instruction == ai.DETAILED_PROMPT
+
+
 def test_answer_raises_other_errors():
     a = make_answerer([Exception("400 API key not valid")])
     with pytest.raises(Exception, match="400"):

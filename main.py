@@ -18,6 +18,7 @@ from overlay import Overlay
 IS_MAC = sys.platform == "darwin"
 SHORTCUTS = {
     "ctrl+shift+q": "capture",
+    "ctrl+shift+d": "capture_detailed",
     "ctrl+shift+h": "toggle",
     "ctrl+shift+up": "bigger",
     "ctrl+shift+down": "smaller",
@@ -26,6 +27,7 @@ SHORTCUTS = {
 }
 SHORTCUT_HELP = {
     "ctrl+shift+q": "answer the question on screen",
+    "ctrl+shift+d": "answer with a short explanation",
     "ctrl+shift+h": "show / hide the answer",
     "ctrl+shift+up": "bigger text",
     "ctrl+shift+down": "smaller text",
@@ -86,6 +88,10 @@ class App:
         self.overlay.set_text(self._status_message())
         if not self.answerer:
             self.open_settings()
+
+        quit_after = os.getenv("SCREENINTEL_QUIT_AFTER_MS")  # used by CI to test a clean shutdown
+        if quit_after:
+            self.root.after(int(quit_after), self.quit)
         self.root.after(50, self._poll)
         self.root.after(KEEP_ON_TOP_MS, self._keep_on_top)
 
@@ -116,7 +122,9 @@ class App:
 
     def _handle(self, name, value):
         if name == "capture":
-            self._capture()
+            self._capture(detailed=False)
+        elif name == "capture_detailed":
+            self._capture(detailed=True)
         elif name == "toggle":
             self.overlay.toggle()
         elif name == "bigger":
@@ -150,7 +158,7 @@ class App:
         self.overlay.set_text("Settings saved. " + self._status_message())
         self.overlay.set_visible(True)
 
-    def _capture(self):
+    def _capture(self, detailed):
         if self.busy:
             return
         if not self.answerer:
@@ -159,17 +167,17 @@ class App:
         self.busy = True
         self.overlay.set_visible(False)
         self.root.update()
-        self.root.after(HIDE_DELAY_MS, self._grab_and_ask)
+        self.root.after(HIDE_DELAY_MS, self._grab_and_ask, detailed)
 
-    def _grab_and_ask(self):
+    def _grab_and_ask(self, detailed):
         image = ImageGrab.grab(all_screens=not IS_MAC)  # macOS: main display only
         self.overlay.set_text("...")
         self.overlay.set_visible(True)
-        threading.Thread(target=self._ask, args=(image,), daemon=True).start()
+        threading.Thread(target=self._ask, args=(image, detailed), daemon=True).start()
 
-    def _ask(self, image):
+    def _ask(self, image, detailed):
         try:
-            text = self.answerer.answer(image)
+            text = self.answerer.answer(image, detailed=detailed)
         except Exception as e:
             text = f"Error: {str(e)[:120]}"
         self.events.put(("answer", text))
@@ -211,6 +219,13 @@ def main():
         except (AttributeError, OSError):
             pass
     App().run()
+
+    # Let background threads finish cleanly (e.g. the tray icon removing itself), then make sure
+    # nothing keeps the process alive after the user turned the app off.
+    for thread in threading.enumerate():
+        if thread is not threading.main_thread() and not thread.daemon:
+            thread.join(2)
+    os._exit(0)
 
 
 if __name__ == "__main__":

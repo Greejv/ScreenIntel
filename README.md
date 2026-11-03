@@ -95,6 +95,7 @@ Open **Settings** any time by clicking the Dock icon, or from the app menu (**Sc
 | Shortcut | What it does |
 |:--|:--|
 | `Ctrl` + `Shift` + `Q` | 📸 Read the screen and answer |
+| `Ctrl` + `Shift` + `D` | 📝 Detailed answer: the answer plus a short explanation |
 | `Ctrl` + `Shift` + `H` | 👁️ Hide / show the answer |
 | `Ctrl` + `Shift` + `↑` | 🔠 Bigger text |
 | `Ctrl` + `Shift` + `↓` | 🔡 Smaller text |
@@ -202,6 +203,18 @@ GEMINI_API_KEY=your_key_here
 GEMINI_MODEL=gemini-3.5-flash-lite   # optional, this is the default
 FONT_SIZE=14                         # optional, 4 to 72
 ```
+</details>
+
+<details>
+<summary><b>What the app leaves on your computer, and how to uninstall</b></summary>
+
+Screen Intel installs nothing. It runs no services, adds no startup entries or registry keys, and nothing of it keeps running after you turn it off (`Ctrl` + `Shift` + `X`, tray → Quit, or `Cmd` + `Q`).
+
+The only file it keeps is the settings file from the table above. While it runs on Windows, the `.exe` unpacks itself into a temporary `_MEI...` folder in `%TEMP%`, which is deleted automatically when the app turns off. It's only left behind if the app is force-killed (e.g. from Task Manager).
+
+Every build is checked automatically: the app must start, turn itself off, exit cleanly and leave no temporary files.
+
+**To uninstall:** delete `ScreenIntel.exe` (or `ScreenIntel.app`) and the `ScreenIntel` settings folder.
 </details>
 
 <details>

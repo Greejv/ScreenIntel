@@ -36,6 +36,10 @@ Screen Intel is four small modules wired together by `main.py`.
 - Every other thread (hotkeys, tray, Gemini worker) communicates by putting `(name, value)` tuples on `App.events`.
 - Unhandled exceptions in tk callbacks are shown on the overlay via `report_callback_exception`, because the packaged app has no console.
 
+## Shutdown
+
+`App.quit` stops the shortcuts and tray icon and destroys the tk root. `main()` then joins any non-daemon threads for up to 2 s and calls `os._exit(0)`, so nothing can keep the process alive after the user turns it off. The app creates no services, startup entries or files other than the settings file.
+
 ## Configuration
 
 `settings.load()` merges, highest priority first:
@@ -53,7 +57,7 @@ With no key, the app starts anyway, shows a hint on the overlay and opens the Se
 | Job | Runs on | What it does |
 |---|---|---|
 | `test` | Ubuntu | `ruff check`, `pytest` |
-| `build` | Windows, macOS | PyInstaller build (`--onefile` exe / `--windowed` .app zipped with `ditto`), then a smoke test: launch with a dummy key and require it to still be running after 15 s. Uploads the artifact. |
+| `build` | Windows, macOS | PyInstaller build (`--onefile` exe / `--windowed` .app zipped with `ditto`), then a smoke test: launch with a dummy key, require it to be running after 8 s, let it quit itself via `SCREENINTEL_QUIT_AFTER_MS`, and require exit code 0, no leftover process and (Windows) no leftover `_MEI` temp folder. Uploads the artifact. |
 | `release` | Ubuntu, pushes only | If release `v$(cat VERSION)` (or the pushed tag) doesn't exist, creates it with both files attached. |
 
 The macOS build targets Apple Silicon (`macos-latest`) and is not code-signed or notarized.

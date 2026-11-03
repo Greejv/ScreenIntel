@@ -20,6 +20,17 @@ Answer as short as possible. No explanations, no repeating the question, no mark
 - No question found: reply only "?".
 """
 
+DETAILED_PROMPT = """You are looking at a full screenshot of a computer screen.
+Most of it is clutter (browser bars, tabs, taskbar, ads, other windows, menus). Ignore all of that.
+Find the quiz question(s) on the screen and answer them with a short explanation.
+
+For each question:
+- First line: the answer, in the same compact form as a quiz answer (option letter, word per blank, etc.).
+- Then at most 3 short sentences explaining why, or the key steps for a calculation.
+No markdown, no headings, no repeating the question. Several questions: number them.
+No question found: reply only "?".
+"""
+
 _BUSY_MARKERS = ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED")
 
 
@@ -27,10 +38,16 @@ class Answerer:
     def __init__(self, api_key, model):
         self._client = genai.Client(api_key=api_key)
         self._model = model
-        self._config = types.GenerateContentConfig(system_instruction=PROMPT)
+        self._configs = {
+            False: types.GenerateContentConfig(system_instruction=PROMPT),
+            True: types.GenerateContentConfig(system_instruction=DETAILED_PROMPT),
+        }
 
-    def answer(self, image, tries=4):
-        """Return Gemini's answer for a PIL image. Retries while the model is busy."""
+    def answer(self, image, detailed=False, tries=4):
+        """Return Gemini's answer for a PIL image (with a short explanation if detailed).
+
+        Retries while the model is busy.
+        """
         buf = io.BytesIO()
         image.convert("RGB").save(buf, format="JPEG", quality=90)
         contents = [types.Part.from_bytes(data=buf.getvalue(), mime_type="image/jpeg")]
@@ -38,7 +55,7 @@ class Answerer:
         for attempt in range(1, tries + 1):
             try:
                 resp = self._client.models.generate_content(
-                    model=self._model, contents=contents, config=self._config
+                    model=self._model, contents=contents, config=self._configs[detailed]
                 )
                 return (resp.text or "").strip() or "?"
             except Exception as e:
