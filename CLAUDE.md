@@ -38,4 +38,6 @@ Bump `VERSION` (semver, no `v`) and push to `main`. CI builds both platforms and
 - Windows overlay transparency uses `-transparentcolor` with `KEY_COLOR`; hidden means "draw nothing", never `withdraw()` (keeps the window from stealing focus).
 - macOS needs Screen Recording and Accessibility permissions; without them screenshots show only the wallpaper and shortcuts do nothing, with no error.
 - `ImageGrab.grab(all_screens=True)` only covers all monitors on Windows; macOS captures the main display.
+- Other windows can push a topmost window down, so `App._keep_on_top` re-raises the overlay every 2 s (`SWP_NOACTIVATE`, never steals focus).
+- Restart (`Ctrl+Shift+R`) spawns a new process with `PYINSTALLER_RESET_ENVIRONMENT=1` after unregistering the shortcuts; keep that order.
 - The one-file Windows exe takes several seconds to start. That's PyInstaller unpacking, not a bug.

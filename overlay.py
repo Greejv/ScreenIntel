@@ -11,7 +11,7 @@ KEY_COLOR = "systemTransparent" if IS_MAC else "#010101"
 TEXT_COLOR = "white"
 # Windows 11 taskbar clock font, falling back to the Windows 10 one.
 WINDOWS_FONTS = ("Segoe UI Variable Text", "Segoe UI")
-MIN_FONT, MAX_FONT = 6, 72
+MIN_FONT, MAX_FONT = 4, 72
 PAD = 4
 
 GWL_EXSTYLE = -20
@@ -61,6 +61,18 @@ class Overlay:
         hwnd = user32.GetParent(self.root.winfo_id())
         style = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
         user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE)
+
+    def raise_to_top(self):
+        """Put the overlay back on top without taking focus."""
+        if IS_MAC:
+            self.root.lift()
+            return
+        import ctypes
+
+        hwnd_topmost = -1
+        swp_flags = 0x0001 | 0x0002 | 0x0010  # SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE
+        hwnd = ctypes.windll.user32.GetParent(self.root.winfo_id())
+        ctypes.windll.user32.SetWindowPos(hwnd, hwnd_topmost, 0, 0, 0, 0, swp_flags)
 
     def set_text(self, text):
         self._text = text

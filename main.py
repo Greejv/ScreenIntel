@@ -2,6 +2,7 @@
 
 import os
 import queue
+import subprocess
 import sys
 import threading
 import tkinter as tk
@@ -23,8 +24,10 @@ SHORTCUTS = {
     "ctrl+shift+h": "toggle",
     "ctrl+shift+up": "bigger",
     "ctrl+shift+down": "smaller",
+    "ctrl+shift+r": "restart",
 }
 HIDE_DELAY_MS = 150  # let the overlay disappear before the screenshot is taken
+KEEP_ON_TOP_MS = 2000  # other windows can push the overlay behind them; re-raise it this often
 
 
 def app_dir():
@@ -111,6 +114,11 @@ class App:
 
         self.overlay.set_text(self._startup_message(key))
         self.root.after(50, self._poll)
+        self.root.after(KEEP_ON_TOP_MS, self._keep_on_top)
+
+    def _keep_on_top(self):
+        self.overlay.raise_to_top()
+        self.root.after(KEEP_ON_TOP_MS, self._keep_on_top)
 
     def _startup_message(self, key):
         if not key:
@@ -134,15 +142,17 @@ class App:
         elif name == "toggle":
             self.overlay.toggle()
         elif name == "bigger":
-            self.overlay.change_font(+2)
+            self.overlay.change_font(+1)
         elif name == "smaller":
-            self.overlay.change_font(-2)
+            self.overlay.change_font(-1)
         elif name == "answer":
             self.busy = False
             self.overlay.set_text(value)
             self.overlay.set_visible(True)
         elif name == "quit":
             self.quit()
+        elif name == "restart":
+            self.restart()
 
     def _capture(self):
         if self.busy:
@@ -178,6 +188,19 @@ class App:
         if self.tray:
             self.tray.stop()
         self.root.destroy()
+
+    def restart(self):
+        """Start a fresh copy of the app (re-reads the key and settings), then quit this one."""
+        self.hotkeys.stop()
+        self.hotkeys.join(1)  # release the shortcuts before the new copy registers them
+        if getattr(sys, "frozen", False):
+            cmd = [sys.executable]
+        else:
+            cmd = [sys.executable, str(Path(__file__).resolve())]
+        # Tell a PyInstaller one-file exe to unpack itself again instead of reusing our temp folder.
+        env = dict(os.environ, PYINSTALLER_RESET_ENVIRONMENT="1")
+        subprocess.Popen(cmd, env=env)
+        self.quit()
 
     def run(self):
         self.root.mainloop()

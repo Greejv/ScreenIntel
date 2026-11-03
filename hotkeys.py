@@ -98,5 +98,8 @@ class MacHotkeys:
     def stop(self):
         self._listener.stop()
 
+    def join(self, timeout=None):
+        self._listener.join(timeout)
+
 
 HotkeyListener = MacHotkeys if sys.platform == "darwin" else WindowsHotkeys

@@ -98,6 +98,7 @@ Quit any time from the Dock icon or with `Cmd` + `Q`.
 | `Ctrl` + `Shift` + `H` | 👁️ Hide / show the answer |
 | `Ctrl` + `Shift` + `↑` | 🔠 Bigger text |
 | `Ctrl` + `Shift` + `↓` | 🔡 Smaller text |
+| `Ctrl` + `Shift` + `R` | 🔄 Restart the app (e.g. after changing your key) |
 
 The same shortcuts work on Mac (use `Ctrl`, not `Cmd`).
 
@@ -124,13 +125,13 @@ Click directly **on the text** and drag it wherever you like. Clicks on the empt
 <details>
 <summary><b>"No Gemini API key. Restart the app to enter one."</b></summary>
 
-You closed the key box without entering a key. Quit the app (tray icon → Quit, or `Cmd` + `Q`) and start it again.
+You closed the key box without entering a key. Press `Ctrl` + `Shift` + `R` to restart the app and enter it.
 </details>
 
 <details>
 <summary><b>"Error: ... API key not valid"</b> or I want to change my key</summary>
 
-Delete the saved settings file, then restart the app and paste the new key:
+Delete the saved settings file, then restart the app (`Ctrl` + `Shift` + `R`) and paste the new key:
 
 - **Windows:** press `Win` + `R`, paste `%APPDATA%\ScreenIntel` and press Enter, then delete `.env`.
 - **macOS:** in Finder press `Cmd` + `Shift` + `G`, paste `~/Library/Application Support/ScreenIntel` and delete `.env`. (Press `Cmd` + `Shift` + `.` to show hidden files.)
