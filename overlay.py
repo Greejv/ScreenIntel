@@ -1,21 +1,30 @@
-"""Always-on-top, borderless, transparent window that shows only outlined text."""
+"""Always-on-top, borderless, transparent window that shows only the answer text."""
 
 import sys
 import tkinter as tk
+from tkinter import font as tkfont
 
 IS_MAC = sys.platform == "darwin"
 
 # Windows: pixels of KEY_COLOR become fully transparent and click-through. macOS: native transparency.
 KEY_COLOR = "systemTransparent" if IS_MAC else "#010101"
 TEXT_COLOR = "white"
-OUTLINE_COLOR = "black"
-FONT_FAMILY = "Helvetica" if IS_MAC else "Segoe UI"
+# Windows 11 taskbar clock font, falling back to the Windows 10 one.
+WINDOWS_FONTS = ("Segoe UI Variable Text", "Segoe UI")
 MIN_FONT, MAX_FONT = 6, 72
 PAD = 4
 
 GWL_EXSTYLE = -20
 WS_EX_TOOLWINDOW = 0x00000080  # no taskbar button, not in Alt+Tab
 WS_EX_NOACTIVATE = 0x08000000  # clicking/dragging never steals focus from the quiz page
+
+
+def system_font_family(root):
+    """The font the OS uses for its own UI: SF Pro on macOS, the taskbar clock font on Windows."""
+    if IS_MAC:
+        return tkfont.nametofont("TkDefaultFont", root=root).actual("family")
+    installed = set(tkfont.families(root))
+    return next((f for f in WINDOWS_FONTS if f in installed), "TkDefaultFont")
 
 
 class Overlay:
@@ -25,6 +34,7 @@ class Overlay:
         self.visible = True
         self._text = ""
         self._drag_from = None
+        self._font_family = system_font_family(root)
 
         root.overrideredirect(True)
         root.attributes("-topmost", True)
@@ -74,14 +84,8 @@ class Overlay:
             c.config(width=1, height=1)  # only transparent pixels left: invisible and click-through
             return
 
-        font = (FONT_FAMILY, self.font_size, "bold")
+        font = (self._font_family, self.font_size)
         wrap = self.font_size * 30
-        o = max(1, self.font_size // 12)
-        for dx in (-o, 0, o):
-            for dy in (-o, 0, o):
-                if dx or dy:
-                    c.create_text(PAD + dx, PAD + dy, text=self._text, font=font,
-                                  fill=OUTLINE_COLOR, anchor="nw", width=wrap)
         c.create_text(PAD, PAD, text=self._text, font=font, fill=TEXT_COLOR, anchor="nw", width=wrap)
 
         _, _, x2, y2 = c.bbox("all")

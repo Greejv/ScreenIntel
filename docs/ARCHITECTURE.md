@@ -19,7 +19,7 @@ Screen Intel is four small modules wired together by `main.py`.
 | `main.py` | App lifecycle: load or ask for the API key, create the overlay, start shortcuts and tray, route events, take screenshots, run the Gemini call on a worker thread. | all modules below |
 | `ai.py` | The prompt and the Gemini call. JPEG-encodes the image, retries on 503/429 with backoff, returns a stripped string (`"?"` if empty). | `google-genai`, Pillow |
 | `hotkeys.py` | Global shortcuts. `WindowsHotkeys` uses Win32 `RegisterHotKey` on its own message-loop thread (no keyboard hook, so antivirus doesn't flag it). `MacHotkeys` uses `pynput.GlobalHotKeys`. `HotkeyListener` picks one per platform. | ctypes / pynput |
-| `overlay.py` | Borderless, topmost, transparent tk window showing white text with a black outline. Drag by the text, font size steps, show/hide. Windows: `WS_EX_NOACTIVATE` + `WS_EX_TOOLWINDOW`, so it never takes focus and has no taskbar button. | tkinter |
+| `overlay.py` | Borderless, topmost, transparent tk window showing white text in the system UI font (Segoe UI Variable on Windows 11, SF Pro on macOS). Drag by the text, font size steps, show/hide. Windows: `WS_EX_NOACTIVATE` + `WS_EX_TOOLWINDOW`, so it never takes focus and has no taskbar button. | tkinter |
 
 ## Flow of one answer
 
