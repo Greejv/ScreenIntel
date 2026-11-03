@@ -42,4 +42,6 @@ Bump `VERSION` (semver, no `v`) and push to `main`. CI builds both platforms and
 - Other windows can push a topmost window down, so `App._keep_on_top` re-raises the overlay every 250 ms, after every redraw and while dragging (`SWP_NOACTIVATE`, never steals focus). This keeps it above the Windows taskbar too.
 - Restart (`Ctrl+Shift+R`) spawns a new process with `PYINSTALLER_RESET_ENVIRONMENT=1` after unregistering the shortcuts; keep that order.
 - Never add services, startup entries, registry keys or files beyond the settings file. CI checks that the app quits cleanly and leaves no `_MEI` temp folder; keep `main()`'s thread join + `os._exit(0)`.
+- Settings pauses the app's shortcuts while open (`App._stop_hotkeys` / `_settings_closed`); otherwise RegisterHotKey swallows the keys being recorded and `is_free` reports our own shortcuts as taken.
+- Shortcut strings are always canonical (`hotkeys.canonical`: ctrl, shift, alt, win, then key) so comparisons and the `SYSTEM_SHORTCUTS` lookup work.
 - The one-file Windows exe takes several seconds to start. That's PyInstaller unpacking, not a bug.

@@ -82,11 +82,15 @@ class App:
         key = self.settings["api_key"]
         return Answerer(key, self.settings["model"]) if key else None
 
-    def _start_hotkeys(self):
-        """(Re)register the shortcuts from settings; each one puts its action on the event queue."""
+    def _stop_hotkeys(self):
         if self.hotkeys:
             self.hotkeys.stop()
-            self.hotkeys.join(1)
+            self.hotkeys.join(1)  # wait until the shortcuts are released
+            self.hotkeys = None
+
+    def _start_hotkeys(self):
+        """(Re)register the shortcuts from settings; each one puts its action on the event queue."""
+        self._stop_hotkeys()
         bindings = {
             combo: (lambda action=action: self.events.put((action, None)))
             for action, combo in self.settings["shortcuts"].items()
@@ -99,7 +103,7 @@ class App:
         if not self.answerer:
             where = "the app menu" if IS_MAC else "the tray icon"
             return f"No Gemini API key. Open Settings from {where}."
-        if self.hotkeys.failed:
+        if self.hotkeys and self.hotkeys.failed:
             used = ", ".join(settings.shortcut_label(c) for c in self.hotkeys.failed)
             return f"Shortcut already used by another app: {used}. Change it in Settings."
         return f"Ready. {settings.shortcut_label(self.settings['shortcuts']['capture'])} to answer."
@@ -139,16 +143,21 @@ class App:
         if self.settings_window and self.settings_window.is_open():
             self.settings_window.focus()
             return
+        # Pause our shortcuts so pressing them in Settings records them (and they don't count as taken).
+        self._stop_hotkeys()
         self.settings_window = settings.SettingsWindow(
-            self.root, self.settings, self._apply_settings
+            self.root, self.settings, self._apply_settings, self._settings_closed
         )
+
+    def _settings_closed(self):
+        self._start_hotkeys()
+        if self.hotkeys.failed:
+            self.overlay.set_text(self._status_message())
+            self.overlay.set_visible(True)
 
     def _apply_settings(self, new):
         settings.save(new)
-        shortcuts_changed = new["shortcuts"] != self.settings["shortcuts"]
-        self.settings = new
-        if shortcuts_changed:
-            self._start_hotkeys()
+        self.settings = new  # shortcuts are re-registered when the window closes
         self.answerer = self._make_answerer()
         self.overlay.set_font_size(new["font_size"])
         self.overlay.set_text("Settings saved. " + self._status_message())
@@ -184,15 +193,14 @@ class App:
         self.overlay.set_visible(True)
 
     def quit(self):
-        self.hotkeys.stop()
+        self._stop_hotkeys()
         if self.tray:
             self.tray.stop()
         self.root.destroy()
 
     def restart(self):
         """Start a fresh copy of the app (re-reads the key and settings), then quit this one."""
-        self.hotkeys.stop()
-        self.hotkeys.join(1)  # release the shortcuts before the new copy registers them
+        self._stop_hotkeys()  # release the shortcuts before the new copy registers them
         if getattr(sys, "frozen", False):
             cmd = [sys.executable]
         else:

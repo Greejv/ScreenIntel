@@ -48,7 +48,7 @@ Screen Intel is four small modules wired together by `main.py`.
 2. Per-user file written by the Settings window: `%APPDATA%\ScreenIntel\.env` or `~/Library/Application Support/ScreenIntel/.env`
 3. `.env` next to the executable (or next to `main.py` when run from source)
 
-With no key, the app starts anyway, shows a hint on the overlay and opens the Settings window. Saving applies immediately (`App._apply_settings` rebuilds the `Answerer`, resizes the text and re-registers changed shortcuts). Shortcuts are stored as `SHORTCUT_<ACTION>=ctrl+shift+q`; if a hand-edited file has an invalid or duplicate one, all shortcuts fall back to the defaults. The placeholder value from `.env.example` is treated as "no key".
+With no key, the app starts anyway, shows a hint on the overlay and opens the Settings window. Saving applies immediately (`App._apply_settings` rebuilds the `Answerer`, resizes the text and re-registers changed shortcuts). Shortcuts are recorded by pressing them (`settings.ShortcutField` decodes tk key events with `hotkeys.mods_from_state` / `key_from_event`), checked against `hotkeys.SYSTEM_SHORTCUTS` and, on Windows, `hotkeys.is_free` (a test `RegisterHotKey`). The app pauses its own shortcuts while Settings is open and re-registers them when it closes. They are stored as `SHORTCUT_<ACTION>=ctrl+shift+q` in canonical modifier order (ctrl, shift, alt, win); if a hand-edited file has an invalid or duplicate one, all shortcuts fall back to the defaults. The placeholder value from `.env.example` is treated as "no key".
 
 ## Build and release
 

@@ -34,6 +34,7 @@ If you changed anything visual or platform-specific, also run the app and check 
 - [ ] `Ctrl+Shift+R` restarts the app (old copy gone, new one shows "Ready")
 - [ ] The text can be dragged, and clicks next to it reach the window behind
 - [ ] Settings opens (tray on Windows, Dock icon / Cmd+, on macOS), and Save applies the key and text size right away
+- [ ] In Settings, clicking a shortcut box and pressing e.g. Ctrl+Alt+T records it; Ctrl+C is refused as a system shortcut; the new shortcut works after Save
 - [ ] Quit works: `Ctrl+Shift+X`, tray icon on Windows, Cmd+Q on macOS
 
 ## Code guidelines

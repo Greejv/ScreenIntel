@@ -32,6 +32,108 @@ def parse(combo):
     return flags, vk
 
 
+_MOD_ORDER = ("ctrl", "shift", "alt", "win")
+
+# Well-known OS and editing shortcuts that must not be taken over globally (combo: what it does).
+_WINDOWS_SYSTEM = {
+    "ctrl+c": "Copy", "ctrl+v": "Paste", "ctrl+x": "Cut", "ctrl+z": "Undo", "ctrl+y": "Redo",
+    "ctrl+a": "Select all", "ctrl+s": "Save", "ctrl+f": "Find", "ctrl+p": "Print", "ctrl+n": "New",
+    "ctrl+o": "Open", "ctrl+w": "Close tab", "ctrl+t": "New tab", "ctrl+r": "Reload",
+    "ctrl+shift+z": "Redo", "ctrl+shift+s": "Save as", "ctrl+shift+v": "Paste as plain text",
+    "ctrl+shift+t": "Reopen closed tab", "ctrl+shift+n": "New private window / new folder",
+    "alt+tab": "Switch windows", "alt+f4": "Close window", "alt+space": "Window menu",
+    "win+d": "Show desktop", "win+e": "File Explorer", "win+l": "Lock PC", "win+r": "Run",
+    "win+i": "Settings", "win+s": "Search", "win+a": "Quick settings", "win+v": "Clipboard history",
+    "win+x": "Quick link menu", "win+m": "Minimize all", "win+tab": "Task view",
+    "win+space": "Switch input language", "win+up": "Maximize window", "win+down": "Minimize window",
+    "win+left": "Snap window left", "win+right": "Snap window right", "win+shift+s": "Snipping Tool",
+    "win+p": "Project to a screen", "win+k": "Cast", "win+h": "Voice typing",
+}
+_MAC_SYSTEM = {
+    "win+c": "Copy", "win+v": "Paste", "win+x": "Cut", "win+z": "Undo", "win+shift+z": "Redo",
+    "win+a": "Select all", "win+s": "Save", "win+f": "Find", "win+p": "Print", "win+n": "New",
+    "win+o": "Open", "win+w": "Close window", "win+t": "New tab", "win+r": "Reload",
+    "win+q": "Quit app", "win+h": "Hide app", "win+m": "Minimize", "win+tab": "Switch apps",
+    "win+space": "Spotlight", "win+shift+3": "Screenshot", "win+shift+4": "Screenshot of area",
+    "win+shift+5": "Screenshot tools", "ctrl+win+q": "Lock screen", "ctrl+win+f": "Full screen",
+    "ctrl+win+space": "Emoji picker", "ctrl+space": "Switch input source", "ctrl+up": "Mission Control",
+    "ctrl+down": "App windows", "ctrl+left": "Previous desktop", "ctrl+right": "Next desktop",
+    "alt+win+d": "Show / hide Dock",
+}
+SYSTEM_SHORTCUTS = _MAC_SYSTEM if sys.platform == "darwin" else _WINDOWS_SYSTEM
+
+
+def canonical(mods, key):
+    """Modifiers in a fixed order, key last: ({'shift','ctrl'}, 'q') -> 'ctrl+shift+q'."""
+    return "+".join([m for m in _MOD_ORDER if m in mods] + [key])
+
+
+def is_free(combo):
+    """True if no other app has this shortcut. Only Windows can tell; macOS always says True.
+
+    Pause our own listener first, or our own shortcuts count as taken.
+    """
+    if sys.platform != "win32":
+        return True
+    import ctypes
+
+    probe_id = 0xBFFF
+    flags, vk = parse(combo)
+    user32 = ctypes.windll.user32
+    if not user32.RegisterHotKey(None, probe_id, flags | MOD_NOREPEAT, vk):
+        return False
+    user32.UnregisterHotKey(None, probe_id)
+    return True
+
+
+# Recording shortcuts from tkinter key events.
+_MOD_KEYSYMS = {
+    "Shift_L": "shift", "Shift_R": "shift", "Control_L": "ctrl", "Control_R": "ctrl",
+    "Alt_L": "alt", "Alt_R": "alt", "Option_L": "alt", "Option_R": "alt",
+    "Meta_L": "win", "Meta_R": "win", "Win_L": "win", "Win_R": "win", "Super_L": "win", "Super_R": "win",
+}
+_VK_TO_KEY = {vk: k for k, vk in _KEYS.items()}
+
+
+def modifier_from_keysym(keysym):
+    """'Control_L' -> 'ctrl'; None if the key isn't a modifier."""
+    return _MOD_KEYSYMS.get(keysym)
+
+
+def mods_from_state(state):
+    """Modifiers held during a tkinter key event (event.state bits differ per platform)."""
+    mods = set()
+    if state & 0x0004:
+        mods.add("ctrl")
+    if state & 0x0001:
+        mods.add("shift")
+    if sys.platform == "darwin":
+        if state & 0x0010:
+            mods.add("alt")  # Option
+        if state & 0x0008:
+            mods.add("win")  # Command
+    elif state & 0x20000:
+        mods.add("alt")
+    return mods
+
+
+def key_from_event(keysym, keycode):
+    """The shortcut key name for a tkinter key event, or None if it can't be used in a shortcut.
+
+    On Windows keycode is the virtual key code, which ignores Shift (Shift+1 is still '1').
+    """
+    if sys.platform == "win32":
+        if keycode in _VK_TO_KEY:
+            return _VK_TO_KEY[keycode]
+        if 0x30 <= keycode <= 0x39 or 0x41 <= keycode <= 0x5A:
+            return chr(keycode).lower()
+        return None
+    k = keysym.lower()
+    if k in _KEYS or (len(k) == 1 and k.isalnum()):
+        return k
+    return None
+
+
 def to_pynput(combo):
     """'ctrl+shift+up' -> '<ctrl>+<shift>+<up>' (pynput hotkey syntax)."""
     *mods, key = combo.lower().split("+")

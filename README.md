@@ -124,7 +124,7 @@ Open Settings from the **tray icon** (Windows) or by **clicking the Dock icon** 
 | **Gemini API key** | Your key. Tick **Show** to check it, or click **Get a free key**. |
 | **Model** | Which Gemini model answers. Leave the default unless it stops working. |
 | **Text size** | Starting size of the answer text (4 to 72). |
-| **Shortcuts** | Type a new shortcut for any action, like `ctrl+shift+q` or `alt+f2`. Keys: A–Z, 0–9, arrows, space, F1–F12, with at least one of Ctrl, Shift, Alt or Win/Cmd. **Reset shortcuts** restores the defaults. |
+| **Shortcuts** | Click the box next to an action and **press the keys** you want, e.g. `Ctrl` + `Alt` + `T`. Use at least one of Ctrl, Shift, Alt or Win/Cmd plus a letter, number, arrow, space or F1–F12. `Esc` cancels. Screen Intel refuses system shortcuts (like `Ctrl` + `C` or `Win` + `D`), shortcuts used twice, and on Windows any shortcut another app already owns. **Reset shortcuts** restores the defaults. Your shortcuts are paused while Settings is open. |
 
 Click **Save** and the changes apply immediately, no restart needed.
 

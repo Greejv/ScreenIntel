@@ -94,12 +94,30 @@ def test_shortcut_validation():
     assert "valid" in settings.shortcut_errors(dict(good, capture="ctrl+shift+??"))
     assert "needs Ctrl" in settings.shortcut_errors(dict(good, capture="q"))
     assert "used twice" in settings.shortcut_errors(dict(good, capture="ctrl+shift+h"))
+    system_combo = next(iter(hotkeys.SYSTEM_SHORTCUTS))
+    assert "system shortcut" in settings.shortcut_errors(dict(good, capture=system_combo))
+    assert all(c not in hotkeys.SYSTEM_SHORTCUTS for c in good.values())  # defaults are safe
 
 
 def test_shortcut_text_helpers():
     import settings
 
     assert settings.normalize_shortcut(" Control + Shift + F5 ") == "ctrl+shift+f5"
-    assert settings.normalize_shortcut("cmd+option+a") == "win+alt+a"
+    assert settings.normalize_shortcut("cmd+option+a") == "alt+win+a"  # canonical modifier order
+    assert settings.normalize_shortcut("shift+ctrl+q") == "ctrl+shift+q"
     assert settings.shortcut_label("ctrl+shift+up") == "Ctrl+Shift+Up"
     assert hotkeys.parse("alt+f12") == (hotkeys.MOD_ALT, 0x7B)
+
+
+def test_recording_helpers():
+    assert hotkeys.canonical({"shift", "ctrl"}, "q") == "ctrl+shift+q"
+    assert hotkeys.modifier_from_keysym("Control_L") == "ctrl"
+    assert hotkeys.modifier_from_keysym("q") is None
+    assert hotkeys.mods_from_state(0x0004 | 0x0001) == {"ctrl", "shift"}
+    if sys.platform == "win32":
+        assert hotkeys.key_from_event("exclam", 0x31) == "1"  # Shift+1 still records as 1
+        assert hotkeys.key_from_event("Up", 0x26) == "up"
+    else:
+        assert hotkeys.key_from_event("Q", 0) == "q"
+        assert hotkeys.key_from_event("F5", 0) == "f5"
+        assert hotkeys.key_from_event("Escape", 0) is None

@@ -9,7 +9,7 @@ from tkinter import ttk
 
 from dotenv import dotenv_values, set_key
 
-from hotkeys import parse as parse_shortcut
+import hotkeys
 
 IS_MAC = sys.platform == "darwin"
 DEFAULT_MODEL = "gemini-3.5-flash-lite"
@@ -35,8 +35,10 @@ _MOD_ALIASES = {"control": "ctrl", "option": "alt", "cmd": "win", "command": "wi
 
 def normalize_shortcut(text):
     """'Ctrl + Shift + Q' -> 'ctrl+shift+q'. Also accepts control/option/cmd."""
-    parts = [p for p in text.lower().replace(" ", "").split("+") if p]
-    return "+".join(_MOD_ALIASES.get(p, p) for p in parts)
+    parts = [_MOD_ALIASES.get(p, p) for p in text.lower().replace(" ", "").split("+") if p]
+    if not parts:
+        return ""
+    return hotkeys.canonical(set(parts[:-1]), parts[-1])
 
 
 def shortcut_label(combo):
@@ -45,17 +47,27 @@ def shortcut_label(combo):
     return "+".join(names.get(p, p.upper() if len(p) == 1 else p.capitalize()) for p in combo.split("+"))
 
 
-def shortcut_errors(shortcuts):
-    """Return a message for the first invalid or duplicate shortcut, or None if all are fine."""
+def shortcut_errors(shortcuts, check_free=False):
+    """Return a message for the first unusable shortcut, or None if all are fine.
+
+    Checks: valid key, has a modifier, not a well-known system shortcut, not used twice, and with
+    check_free (Windows only) not already taken by another app.
+    """
     seen = {}
     for action, combo in shortcuts.items():
         label = ACTIONS[action][1]
         try:
-            flags, _ = parse_shortcut(combo)
+            flags, _ = hotkeys.parse(combo)
         except (ValueError, KeyError):
-            return f'"{combo}" for "{label}" isn\'t a valid shortcut. Example: ctrl+shift+q'
+            return f'"{combo}" for "{label}" isn\'t a valid shortcut.'
         if not flags:
-            return f'The shortcut for "{label}" needs Ctrl, Shift, Alt or Win/Cmd.'
+            return f'The shortcut for "{label}" needs Ctrl, Shift, Alt or {"Cmd" if IS_MAC else "Win"}.'
+        if combo in hotkeys.SYSTEM_SHORTCUTS:
+            name = hotkeys.SYSTEM_SHORTCUTS[combo]
+            return f'{shortcut_label(combo)} is a system shortcut ({name}). Pick another for "{label}".'
+        if check_free and not hotkeys.is_free(combo):
+            taken = "already used by Windows or another app"
+            return f'{shortcut_label(combo)} is {taken}. Pick another for "{label}".'
         if combo in seen:
             return f'"{shortcut_label(combo)}" is used twice ("{seen[combo]}" and "{label}").'
         seen[combo] = label
@@ -117,10 +129,15 @@ def save(settings):
 
 
 class SettingsWindow:
-    """A normal window to edit the API key, model, text size and shortcuts. Calls on_save(settings)."""
+    """A normal window to edit the API key, model, text size and shortcuts.
 
-    def __init__(self, root, current, on_save):
+    Calls on_save(settings) when saved and on_close() whenever the window closes. The app's own
+    shortcuts must be paused while it is open, so pressing them here records them instead.
+    """
+
+    def __init__(self, root, current, on_save, on_close):
         self._on_save = on_save
+        self._on_close = on_close
         self.win = tk.Toplevel(root)
         self.win.title("Screen Intel Settings")
         self.win.resizable(False, False)
@@ -156,7 +173,10 @@ class SettingsWindow:
         )
 
         ttk.Label(f, text="Shortcuts").grid(row=8, column=0, sticky="w")
-        hint = "Type them like ctrl+shift+q. Keys: A-Z, 0-9, up, down, left, right, space, F1-F12."
+        hint = (
+            "Click a box, then press the keys you want (Esc cancels). "
+            "Shortcuts are paused while Settings is open."
+        )
         ttk.Label(f, text=hint, foreground="gray", wraplength=380).grid(
             row=9, column=0, columnspan=3, sticky="w", pady=(0, 4)
         )
@@ -164,10 +184,9 @@ class SettingsWindow:
         row = 10
         for action, (_, label) in ACTIONS.items():
             ttk.Label(f, text=label).grid(row=row, column=0, sticky="w")
-            var = tk.StringVar(value=shortcut_label(current["shortcuts"][action]))
-            entry = ttk.Entry(f, textvariable=var, width=18)
-            entry.grid(row=row, column=1, columnspan=2, sticky="we", pady=1)
-            self.shortcuts[action] = var
+            field = ShortcutField(f, current["shortcuts"][action], self._check_shortcuts)
+            field.entry.grid(row=row, column=1, columnspan=2, sticky="we", pady=1)
+            self.shortcuts[action] = field
             row += 1
         ttk.Button(f, text="Reset shortcuts", command=self._reset_shortcuts).grid(
             row=row, column=0, sticky="w", pady=(4, 12)
@@ -200,10 +219,21 @@ class SettingsWindow:
 
     def close(self):
         self.win.destroy()
+        self._on_close()
 
     def _reset_shortcuts(self):
         for action, (default, _) in ACTIONS.items():
-            self.shortcuts[action].set(shortcut_label(default))
+            self.shortcuts[action].set(default)
+        self._check_shortcuts()
+
+    def _current_shortcuts(self):
+        return {action: field.combo for action, field in self.shortcuts.items()}
+
+    def _check_shortcuts(self):
+        """Show the first problem with the shortcuts right away, or clear the message."""
+        problem = shortcut_errors(self._current_shortcuts(), check_free=True)
+        self.error.config(text=problem or "")
+        return problem
 
     def _toggle_key(self):
         self.key_entry.config(show="" if self.show_key.get() else "•")
@@ -218,11 +248,9 @@ class SettingsWindow:
         except (tk.TclError, ValueError):
             self.error.config(text=f"Text size must be a number from {MIN_FONT} to {MAX_FONT}.")
             return
-        shortcuts = {action: normalize_shortcut(var.get()) for action, var in self.shortcuts.items()}
-        problem = shortcut_errors(shortcuts)
-        if problem:
-            self.error.config(text=problem)
+        if self._check_shortcuts():
             return
+        shortcuts = self._current_shortcuts()
         self._on_save({
             "api_key": key,
             "model": self.model.get().strip() or DEFAULT_MODEL,
@@ -230,3 +258,52 @@ class SettingsWindow:
             "shortcuts": shortcuts,
         })
         self.close()
+
+
+class ShortcutField:
+    """A box that records a shortcut when you press it: click, then press e.g. Ctrl+Shift+Q."""
+
+    def __init__(self, parent, combo, on_change):
+        self.combo = combo
+        self._on_change = on_change
+        self._held = set()  # modifiers whose key is down (catches Win/Cmd that event.state may miss)
+        self._var = tk.StringVar(value=shortcut_label(combo))
+        self.entry = ttk.Entry(parent, textvariable=self._var, width=18, justify="center")
+        self.entry.bind("<FocusIn>", lambda e: self._var.set("Press keys..."))
+        self.entry.bind("<FocusOut>", lambda e: self._show())
+        self.entry.bind("<KeyPress>", self._key_down)
+        self.entry.bind("<KeyRelease>", self._key_up)
+
+    def set(self, combo):
+        self.combo = combo
+        self._show()
+
+    def _show(self):
+        self._held.clear()
+        self._var.set(shortcut_label(self.combo))
+
+    def _key_down(self, event):
+        mod = hotkeys.modifier_from_keysym(event.keysym)
+        if mod:
+            self._held.add(mod)
+        mods = self._held | hotkeys.mods_from_state(event.state)
+        if event.keysym == "Escape" and not mods:
+            self.entry.master.focus_set()  # cancel: keep the old shortcut
+            return "break"
+        key = None if mod else hotkeys.key_from_event(event.keysym, event.keycode)
+        if key is None:
+            # Only modifiers so far (or an unusable key): show what is held.
+            held = hotkeys.canonical(mods, "").rstrip("+")
+            self._var.set(shortcut_label(held) + "+..." if held else "Press keys...")
+            return "break"
+        self.combo = hotkeys.canonical(mods, key)
+        self._show()
+        self.entry.master.focus_set()  # done recording
+        self._on_change()
+        return "break"
+
+    def _key_up(self, event):
+        mod = hotkeys.modifier_from_keysym(event.keysym)
+        if mod:
+            self._held.discard(mod)
+        return "break"
