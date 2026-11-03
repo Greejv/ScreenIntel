@@ -12,6 +12,7 @@ WM_HOTKEY, WM_QUIT = 0x0312, 0x0012
 
 _MODS = {"ctrl": MOD_CONTROL, "shift": MOD_SHIFT, "alt": MOD_ALT, "win": MOD_WIN}
 _KEYS = {"up": 0x26, "down": 0x28, "left": 0x25, "right": 0x27, "space": 0x20}
+_KEYS.update({f"f{n}": 0x6F + n for n in range(1, 13)})  # F1..F12
 
 
 def parse(combo):
@@ -19,6 +20,8 @@ def parse(combo):
     *mods, key = combo.lower().split("+")
     flags = 0
     for m in mods:
+        if m not in _MODS:
+            raise ValueError(f"Unknown modifier in shortcut: {combo}")
         flags |= _MODS[m]
     if key in _KEYS:
         vk = _KEYS[key]

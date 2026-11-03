@@ -9,13 +9,57 @@ from tkinter import ttk
 
 from dotenv import dotenv_values, set_key
 
+from hotkeys import parse as parse_shortcut
+
 IS_MAC = sys.platform == "darwin"
 DEFAULT_MODEL = "gemini-3.5-flash-lite"
 DEFAULT_FONT_SIZE = 14
 MIN_FONT, MAX_FONT = 4, 72
 PLACEHOLDER_KEY = "paste_your_key_here"
 KEY_URL = "https://aistudio.google.com/apikey"
-_ENV_NAMES = ("GEMINI_API_KEY", "GOOGLE_API_KEY", "GEMINI_MODEL", "FONT_SIZE")
+# action: (default shortcut, description shown in Settings)
+ACTIONS = {
+    "capture": ("ctrl+shift+q", "Answer the question on screen"),
+    "capture_detailed": ("ctrl+shift+d", "Answer with a short explanation"),
+    "toggle": ("ctrl+shift+h", "Show / hide the answer"),
+    "bigger": ("ctrl+shift+up", "Bigger text"),
+    "smaller": ("ctrl+shift+down", "Smaller text"),
+    "restart": ("ctrl+shift+r", "Restart"),
+    "quit": ("ctrl+shift+x", "Turn off"),
+}
+_ENV_NAMES = ("GEMINI_API_KEY", "GOOGLE_API_KEY", "GEMINI_MODEL", "FONT_SIZE") + tuple(
+    f"SHORTCUT_{a.upper()}" for a in ACTIONS
+)
+_MOD_ALIASES = {"control": "ctrl", "option": "alt", "cmd": "win", "command": "win"}
+
+
+def normalize_shortcut(text):
+    """'Ctrl + Shift + Q' -> 'ctrl+shift+q'. Also accepts control/option/cmd."""
+    parts = [p for p in text.lower().replace(" ", "").split("+") if p]
+    return "+".join(_MOD_ALIASES.get(p, p) for p in parts)
+
+
+def shortcut_label(combo):
+    """'ctrl+shift+q' -> 'Ctrl+Shift+Q' (macOS shows Cmd for the Windows key)."""
+    names = {"win": "Cmd" if IS_MAC else "Win"}
+    return "+".join(names.get(p, p.upper() if len(p) == 1 else p.capitalize()) for p in combo.split("+"))
+
+
+def shortcut_errors(shortcuts):
+    """Return a message for the first invalid or duplicate shortcut, or None if all are fine."""
+    seen = {}
+    for action, combo in shortcuts.items():
+        label = ACTIONS[action][1]
+        try:
+            flags, _ = parse_shortcut(combo)
+        except (ValueError, KeyError):
+            return f'"{combo}" for "{label}" isn\'t a valid shortcut. Example: ctrl+shift+q'
+        if not flags:
+            return f'The shortcut for "{label}" needs Ctrl, Shift, Alt or Win/Cmd.'
+        if combo in seen:
+            return f'"{shortcut_label(combo)}" is used twice ("{seen[combo]}" and "{label}").'
+        seen[combo] = label
+    return None
 
 
 def app_dir():
@@ -47,10 +91,17 @@ def load():
         font_size = int(values.get("FONT_SIZE", DEFAULT_FONT_SIZE))
     except ValueError:
         font_size = DEFAULT_FONT_SIZE
+    shortcuts = {
+        action: normalize_shortcut(values.get(f"SHORTCUT_{action.upper()}", default))
+        for action, (default, _) in ACTIONS.items()
+    }
+    if shortcut_errors(shortcuts):  # a hand-edited file broke them: fall back to the defaults
+        shortcuts = {action: default for action, (default, _) in ACTIONS.items()}
     return {
         "api_key": None if key == PLACEHOLDER_KEY else key,
         "model": values.get("GEMINI_MODEL") or DEFAULT_MODEL,
         "font_size": max(MIN_FONT, min(MAX_FONT, font_size)),
+        "shortcuts": shortcuts,
     }
 
 
@@ -61,12 +112,14 @@ def save(settings):
     set_key(str(path), "GEMINI_API_KEY", settings["api_key"] or "")
     set_key(str(path), "GEMINI_MODEL", settings["model"])
     set_key(str(path), "FONT_SIZE", str(settings["font_size"]))
+    for action, combo in settings["shortcuts"].items():
+        set_key(str(path), f"SHORTCUT_{action.upper()}", combo)
 
 
 class SettingsWindow:
-    """A normal window to edit the API key, model and text size. Calls on_save(settings)."""
+    """A normal window to edit the API key, model, text size and shortcuts. Calls on_save(settings)."""
 
-    def __init__(self, root, current, on_save, shortcuts):
+    def __init__(self, root, current, on_save):
         self._on_save = on_save
         self.win = tk.Toplevel(root)
         self.win.title("Screen Intel Settings")
@@ -103,16 +156,28 @@ class SettingsWindow:
         )
 
         ttk.Label(f, text="Shortcuts").grid(row=8, column=0, sticky="w")
-        lines = "\n".join(f"{combo.title()}:  {what}" for combo, what in shortcuts.items())
-        ttk.Label(f, text=lines, foreground="gray", justify="left").grid(
-            row=9, column=0, columnspan=3, sticky="w", pady=(0, 12)
+        hint = "Type them like ctrl+shift+q. Keys: A-Z, 0-9, up, down, left, right, space, F1-F12."
+        ttk.Label(f, text=hint, foreground="gray", wraplength=380).grid(
+            row=9, column=0, columnspan=3, sticky="w", pady=(0, 4)
+        )
+        self.shortcuts = {}
+        row = 10
+        for action, (_, label) in ACTIONS.items():
+            ttk.Label(f, text=label).grid(row=row, column=0, sticky="w")
+            var = tk.StringVar(value=shortcut_label(current["shortcuts"][action]))
+            entry = ttk.Entry(f, textvariable=var, width=18)
+            entry.grid(row=row, column=1, columnspan=2, sticky="we", pady=1)
+            self.shortcuts[action] = var
+            row += 1
+        ttk.Button(f, text="Reset shortcuts", command=self._reset_shortcuts).grid(
+            row=row, column=0, sticky="w", pady=(4, 12)
         )
 
-        self.error = ttk.Label(f, text="", foreground="#c0392b")
-        self.error.grid(row=10, column=0, columnspan=3, sticky="w")
+        self.error = ttk.Label(f, text="", foreground="#c0392b", wraplength=380)
+        self.error.grid(row=row + 1, column=0, columnspan=3, sticky="w")
 
         buttons = ttk.Frame(f)
-        buttons.grid(row=11, column=0, columnspan=3, sticky="e", pady=(8, 0))
+        buttons.grid(row=row + 2, column=0, columnspan=3, sticky="e", pady=(8, 0))
         ttk.Button(buttons, text="Cancel", command=self.close).pack(side="right")
         ttk.Button(buttons, text="Save", command=self._save).pack(side="right", padx=(0, 8))
         self.win.bind("<Return>", lambda e: self._save())
@@ -136,6 +201,10 @@ class SettingsWindow:
     def close(self):
         self.win.destroy()
 
+    def _reset_shortcuts(self):
+        for action, (default, _) in ACTIONS.items():
+            self.shortcuts[action].set(shortcut_label(default))
+
     def _toggle_key(self):
         self.key_entry.config(show="" if self.show_key.get() else "•")
 
@@ -149,9 +218,15 @@ class SettingsWindow:
         except (tk.TclError, ValueError):
             self.error.config(text=f"Text size must be a number from {MIN_FONT} to {MAX_FONT}.")
             return
+        shortcuts = {action: normalize_shortcut(var.get()) for action, var in self.shortcuts.items()}
+        problem = shortcut_errors(shortcuts)
+        if problem:
+            self.error.config(text=problem)
+            return
         self._on_save({
             "api_key": key,
             "model": self.model.get().strip() or DEFAULT_MODEL,
             "font_size": max(MIN_FONT, min(MAX_FONT, size)),
+            "shortcuts": shortcuts,
         })
         self.close()

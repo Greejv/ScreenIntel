@@ -12,7 +12,7 @@ What's planned next, roughly in priority order. Open an issue to discuss anythin
 
 - [x] **Settings window** for the API key, model and text size (v1.1.0).
 - [ ] **Remember overlay position and text size** between launches (store via `settings.save`).
-- [ ] **Customizable shortcuts** in the Settings window, for people whose shortcuts clash with other apps.
+- [x] **Customizable shortcuts** in the Settings window (v1.3.0).
 - [ ] **Faster startup on Windows**: ship a `--onedir` zip alongside the one-file exe.
 - [ ] **Monitor choice**: capture only the monitor under the mouse to send smaller images and get faster answers.
 - [ ] **Menu bar icon on macOS** (needs a tray library that coexists with tk's main loop).

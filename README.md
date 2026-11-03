@@ -109,7 +109,7 @@ Open **Settings** any time by clicking the Dock icon, or from the app menu (**Sc
 | `Ctrl` + `Shift` + `R` | 🔄 Restart the app |
 | `Ctrl` + `Shift` + `X` | ⏻ Turn the app off |
 
-The same shortcuts work on Mac (use `Ctrl`, not `Cmd`).
+These are the defaults, and the same ones work on Mac (use `Ctrl`, not `Cmd`). You can change any of them in **Settings**.
 
 ### 🖱️ Moving the answer
 
@@ -124,6 +124,7 @@ Open Settings from the **tray icon** (Windows) or by **clicking the Dock icon** 
 | **Gemini API key** | Your key. Tick **Show** to check it, or click **Get a free key**. |
 | **Model** | Which Gemini model answers. Leave the default unless it stops working. |
 | **Text size** | Starting size of the answer text (4 to 72). |
+| **Shortcuts** | Type a new shortcut for any action, like `ctrl+shift+q` or `alt+f2`. Keys: A–Z, 0–9, arrows, space, F1–F12, with at least one of Ctrl, Shift, Alt or Win/Cmd. **Reset shortcuts** restores the defaults. |
 
 Click **Save** and the changes apply immediately, no restart needed.
 
@@ -164,7 +165,7 @@ Google's servers are busy or you hit the free limit. The app already retries aut
 <details>
 <summary><b>"Shortcut already used by another app: ..."</b></summary>
 
-Another program is using that shortcut. Close it (common ones: screenshot tools, game overlays, Discord) and restart Screen Intel.
+Another program is using that shortcut (common ones: screenshot tools, game overlays, Discord). Open **Settings** and pick a different shortcut for it.
 </details>
 
 <details>

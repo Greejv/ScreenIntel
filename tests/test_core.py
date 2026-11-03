@@ -59,20 +59,47 @@ def test_empty_reply_becomes_question_mark():
 def test_settings_roundtrip(tmp_path, monkeypatch):
     import settings
 
-    for name in ("GEMINI_API_KEY", "GOOGLE_API_KEY", "GEMINI_MODEL", "FONT_SIZE"):
+    for name in settings._ENV_NAMES:
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setattr(settings, "app_dir", lambda: tmp_path / "app")
     monkeypatch.setattr(settings, "user_config_file", lambda: tmp_path / "user" / ".env")
 
-    assert settings.load() == {"api_key": None, "model": settings.DEFAULT_MODEL, "font_size": 14}
+    defaults = {action: default for action, (default, _) in settings.ACTIONS.items()}
+    assert settings.load() == {
+        "api_key": None, "model": settings.DEFAULT_MODEL, "font_size": 14, "shortcuts": defaults
+    }
 
     (tmp_path / "app").mkdir()
     (tmp_path / "app" / ".env").write_text("GEMINI_API_KEY=paste_your_key_here\nFONT_SIZE=999\n")
     assert settings.load()["api_key"] is None  # placeholder means no key
     assert settings.load()["font_size"] == settings.MAX_FONT
 
-    settings.save({"api_key": "abc", "model": "m", "font_size": 9})
-    assert settings.load() == {"api_key": "abc", "model": "m", "font_size": 9}  # settings file wins
+    custom = dict(defaults, capture="alt+f2")
+    settings.save({"api_key": "abc", "model": "m", "font_size": 9, "shortcuts": custom})
+    assert settings.load() == {"api_key": "abc", "model": "m", "font_size": 9, "shortcuts": custom}
+
+    with (tmp_path / "user" / ".env").open("a") as f:
+        f.write("SHORTCUT_TOGGLE=ctrl+banana\n")  # broken by hand
+    assert settings.load()["shortcuts"] == defaults
 
     monkeypatch.setenv("GEMINI_API_KEY", "from-env")
     assert settings.load()["api_key"] == "from-env"  # environment wins
+
+
+def test_shortcut_validation():
+    import settings
+
+    good = {action: default for action, (default, _) in settings.ACTIONS.items()}
+    assert settings.shortcut_errors(good) is None
+    assert "valid" in settings.shortcut_errors(dict(good, capture="ctrl+shift+??"))
+    assert "needs Ctrl" in settings.shortcut_errors(dict(good, capture="q"))
+    assert "used twice" in settings.shortcut_errors(dict(good, capture="ctrl+shift+h"))
+
+
+def test_shortcut_text_helpers():
+    import settings
+
+    assert settings.normalize_shortcut(" Control + Shift + F5 ") == "ctrl+shift+f5"
+    assert settings.normalize_shortcut("cmd+option+a") == "win+alt+a"
+    assert settings.shortcut_label("ctrl+shift+up") == "Ctrl+Shift+Up"
+    assert hotkeys.parse("alt+f12") == (hotkeys.MOD_ALT, 0x7B)

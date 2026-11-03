@@ -16,24 +16,6 @@ from hotkeys import HotkeyListener
 from overlay import Overlay
 
 IS_MAC = sys.platform == "darwin"
-SHORTCUTS = {
-    "ctrl+shift+q": "capture",
-    "ctrl+shift+d": "capture_detailed",
-    "ctrl+shift+h": "toggle",
-    "ctrl+shift+up": "bigger",
-    "ctrl+shift+down": "smaller",
-    "ctrl+shift+r": "restart",
-    "ctrl+shift+x": "quit",
-}
-SHORTCUT_HELP = {
-    "ctrl+shift+q": "answer the question on screen",
-    "ctrl+shift+d": "answer with a short explanation",
-    "ctrl+shift+h": "show / hide the answer",
-    "ctrl+shift+up": "bigger text",
-    "ctrl+shift+down": "smaller text",
-    "ctrl+shift+r": "restart",
-    "ctrl+shift+x": "turn off",
-}
 HIDE_DELAY_MS = 150  # let the overlay disappear before the screenshot is taken
 KEEP_ON_TOP_MS = 250  # the taskbar and other topmost windows can cover the overlay; re-raise it this often
 
@@ -66,11 +48,8 @@ class App:
         self.root.report_callback_exception = self._on_tk_error
         self.overlay = Overlay(self.root, font_size=self.settings["font_size"])
 
-        self.hotkeys = HotkeyListener(
-            {combo: (lambda name=name: self.events.put((name, None))) for combo, name in SHORTCUTS.items()}
-        )
-        self.hotkeys.start()
-        self.hotkeys.ready.wait(2)
+        self.hotkeys = None
+        self._start_hotkeys()
 
         self.tray = None
         if IS_MAC:
@@ -103,13 +82,27 @@ class App:
         key = self.settings["api_key"]
         return Answerer(key, self.settings["model"]) if key else None
 
+    def _start_hotkeys(self):
+        """(Re)register the shortcuts from settings; each one puts its action on the event queue."""
+        if self.hotkeys:
+            self.hotkeys.stop()
+            self.hotkeys.join(1)
+        bindings = {
+            combo: (lambda action=action: self.events.put((action, None)))
+            for action, combo in self.settings["shortcuts"].items()
+        }
+        self.hotkeys = HotkeyListener(bindings)
+        self.hotkeys.start()
+        self.hotkeys.ready.wait(2)
+
     def _status_message(self):
         if not self.answerer:
             where = "the app menu" if IS_MAC else "the tray icon"
             return f"No Gemini API key. Open Settings from {where}."
         if self.hotkeys.failed:
-            return "Shortcut already used by another app: " + ", ".join(self.hotkeys.failed)
-        return "Ready. Ctrl+Shift+Q to answer."
+            used = ", ".join(settings.shortcut_label(c) for c in self.hotkeys.failed)
+            return f"Shortcut already used by another app: {used}. Change it in Settings."
+        return f"Ready. {settings.shortcut_label(self.settings['shortcuts']['capture'])} to answer."
 
     def _poll(self):
         while True:
@@ -147,12 +140,15 @@ class App:
             self.settings_window.focus()
             return
         self.settings_window = settings.SettingsWindow(
-            self.root, self.settings, self._apply_settings, SHORTCUT_HELP
+            self.root, self.settings, self._apply_settings
         )
 
     def _apply_settings(self, new):
         settings.save(new)
+        shortcuts_changed = new["shortcuts"] != self.settings["shortcuts"]
         self.settings = new
+        if shortcuts_changed:
+            self._start_hotkeys()
         self.answerer = self._make_answerer()
         self.overlay.set_font_size(new["font_size"])
         self.overlay.set_text("Settings saved. " + self._status_message())
