@@ -33,7 +33,7 @@ If you changed anything visual or platform-specific, also run the app and check 
 - [ ] `Ctrl+Shift+Up/Down` resizes the text, down to the smallest size without vanishing
 - [ ] `Ctrl+Shift+R` restarts the app (old copy gone, new one shows "Ready")
 - [ ] The text can be dragged, and clicks next to it reach the window behind
-- [ ] Quit works (tray icon on Windows, Cmd+Q on macOS)
+- [ ] Quit works: `Ctrl+Shift+X`, tray icon on Windows, Cmd+Q on macOS
 
 ## Code guidelines
 

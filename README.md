@@ -64,7 +64,7 @@ Screen Intel uses Google's Gemini AI. You need your own key. It's free and takes
 5. A box asks for your API key. **Paste it** and click **OK**.
 6. After a few seconds you'll see **"Ready. Ctrl+Shift+Q to answer."** in the top-left corner. 🎉
 
-A blue dot appears in the system tray (bottom-right, you may need to click `^`). Right-click it to **Show / hide** or **Quit**.
+A blue dot appears in the system tray (bottom-right, you may need to click `^`). Right-click it to **Show / hide** or **Quit**, or press `Ctrl` + `Shift` + `X` to turn it off.
 
 > [!TIP]
 > **Start automatically with Windows:** press `Win` + `R`, type `shell:startup`, press Enter, and put a shortcut to `ScreenIntel.exe` in that folder.
@@ -80,7 +80,7 @@ A blue dot appears in the system tray (bottom-right, you may need to click `^`).
    - **Accessibility** → turn on **ScreenIntel** (so the shortcuts work)
 6. **Quit and reopen** the app so the permissions take effect.
 
-Quit any time from the Dock icon or with `Cmd` + `Q`.
+Turn it off any time with `Ctrl` + `Shift` + `X`, from the Dock icon, or with `Cmd` + `Q`.
 
 ---
 
@@ -99,6 +99,7 @@ Quit any time from the Dock icon or with `Cmd` + `Q`.
 | `Ctrl` + `Shift` + `↑` | 🔠 Bigger text |
 | `Ctrl` + `Shift` + `↓` | 🔡 Smaller text |
 | `Ctrl` + `Shift` + `R` | 🔄 Restart the app (e.g. after changing your key) |
+| `Ctrl` + `Shift` + `X` | ⏻ Turn the app off |
 
 The same shortcuts work on Mac (use `Ctrl`, not `Cmd`).
 

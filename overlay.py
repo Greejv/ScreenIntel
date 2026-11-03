@@ -102,6 +102,7 @@ class Overlay:
 
         _, _, x2, y2 = c.bbox("all")
         c.config(width=x2 + PAD, height=y2 + PAD)
+        self.raise_to_top()
 
     def _start_drag(self, event):
         self._drag_from = (event.x_root - self.root.winfo_x(), event.y_root - self.root.winfo_y())
@@ -109,3 +110,4 @@ class Overlay:
     def _drag(self, event):
         dx, dy = self._drag_from
         self.root.geometry(f"+{event.x_root - dx}+{event.y_root - dy}")
+        self.raise_to_top()  # stay above the taskbar while being dragged over it

@@ -25,9 +25,10 @@ SHORTCUTS = {
     "ctrl+shift+up": "bigger",
     "ctrl+shift+down": "smaller",
     "ctrl+shift+r": "restart",
+    "ctrl+shift+x": "quit",
 }
 HIDE_DELAY_MS = 150  # let the overlay disappear before the screenshot is taken
-KEEP_ON_TOP_MS = 2000  # other windows can push the overlay behind them; re-raise it this often
+KEEP_ON_TOP_MS = 250  # the taskbar and other topmost windows can cover the overlay; re-raise it this often
 
 
 def app_dir():
