@@ -99,7 +99,9 @@ class Overlay:
             c.config(width=1, height=1)  # only transparent pixels left: invisible and click-through
             return
 
-        font = (self._font_family, self.font_size)
+        # Negative size = pixels. Point sizes sometimes rendered nothing at 125% Windows scaling.
+        pixels = max(1, round(self.font_size * self.root.winfo_fpixels("1p")))
+        font = (self._font_family, -pixels)
         wrap = self.font_size * 30
         c.create_text(PAD, PAD, text=self._text, font=font, fill=TEXT_COLOR, anchor="nw", width=wrap)
 
