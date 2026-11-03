@@ -11,7 +11,7 @@ Screen Intel looks at your screen, finds the quiz question, and shows the shorte
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?logo=windows)
 ![macOS](https://img.shields.io/badge/macOS-Apple%20Silicon-000000?logo=apple)
 
-[**⬇️ Download**](https://github.com/Greejv/ScreenIntel/releases/latest) · [Get an API key](#-step-1-get-your-free-gemini-api-key) · [Install](#-step-2-install) · [How to use](#-step-3-use-it) · [Help](#-troubleshooting)
+[**⬇️ Download**](https://github.com/Greejv/ScreenIntel/releases/latest) · [Get an API key](#-step-1-get-your-free-gemini-api-key) · [Install](#-step-2-install) · [How to use](#-step-3-use-it) · [Help](#-troubleshooting) · [Developers](#-for-developers)
 
 </div>
 
@@ -209,13 +209,21 @@ Build the Windows `.exe` yourself with `.\build.bat` (output: `dist\ScreenIntel.
 Run the tests with `pip install pytest && pytest tests`.
 </details>
 
-<details>
-<summary><b>Releasing a new version (maintainers)</b></summary>
 
-Every push to `main` is tested, built for Windows and macOS, and launched once to check it starts.
+---
 
-To publish a new version, change the number in the `VERSION` file (for example `1.0.1`) and push to `main`. The build then creates the GitHub Release `v1.0.1` with both downloads attached. Pushing a `v*` tag works too.
-</details>
+## 👩‍💻 For developers
+
+Want to fix something or add a feature? Start here:
+
+| Doc | What's in it |
+|:--|:--|
+| [Developer guide](CONTRIBUTING.md) | Setup, code guidelines, testing checklist, how to release |
+| [Architecture](docs/ARCHITECTURE.md) | How the modules fit together, threading, configuration, CI |
+| [Roadmap](docs/ROADMAP.md) | What's planned next |
+| [CLAUDE.md](CLAUDE.md) | Instructions for AI coding assistants |
+
+New versions are released by bumping the [`VERSION`](VERSION) file and pushing to `main`: CI tests, builds Windows and macOS, and publishes the release.
 
 ---
 
