@@ -2,6 +2,8 @@
 
 import os
 import re
+import shutil
+import subprocess
 import sys
 import tkinter as tk
 from pathlib import Path
@@ -18,6 +20,9 @@ DEFAULT_FONT_SIZE = 14
 DEFAULT_COLOR = "#ffffff"
 MIN_FONT, MAX_FONT = 4, 72
 PLACEHOLDER_KEY = "paste_your_key_here"
+# The API key lives in the OS credential store (Windows Credential Manager / macOS Keychain), not in the file.
+KEYRING_SERVICE, KEYRING_USER = "ScreenIntel", "gemini_api_key"
+BUNDLE_ID = "io.github.greejv.screenintel"  # macOS app id, set by the build
 KEY_URL = "https://aistudio.google.com/apikey"
 # Swatches offered for the answer color (besides picking one from the screen).
 COLORS = ("#ffffff", "#ffd60a", "#32d74b", "#64d2ff", "#bf5af2", "#ff6482", "#ff9f0a", "#9a9a9a", "#111111")
@@ -119,12 +124,121 @@ def user_config_file():
     return base / "ScreenIntel" / ".env"
 
 
+def _keyring():
+    """The keyring module if this system has a working credential store, else None."""
+    try:
+        import keyring
+        from keyring.backends import fail
+
+        return None if isinstance(keyring.get_keyring(), fail.Keyring) else keyring
+    except Exception:  # not installed, or the store can't be reached
+        return None
+
+
+def read_secret():
+    kr = _keyring()
+    try:
+        return kr.get_password(KEYRING_SERVICE, KEYRING_USER) if kr else None
+    except Exception:
+        return None
+
+
+def write_secret(key):
+    """Store the key in the credential store (or remove it when key is empty). False if there is none."""
+    kr = _keyring()
+    if not kr:
+        return False
+    try:
+        if key:
+            kr.set_password(KEYRING_SERVICE, KEYRING_USER, key)
+        else:
+            delete_secret()
+        return True
+    except Exception:
+        return False
+
+
+def delete_secret():
+    kr = _keyring()
+    try:
+        if kr and kr.get_password(KEYRING_SERVICE, KEYRING_USER) is not None:
+            kr.delete_password(KEYRING_SERVICE, KEYRING_USER)
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _lock_down(path):
+    """Only the current user may read the settings file (macOS; %APPDATA% on Windows is per-user already)."""
+    if sys.platform != "win32":
+        os.chmod(path.parent, 0o700)
+        os.chmod(path, 0o600)
+
+
+def app_location():
+    """What the user deletes to finish uninstalling: the .exe, the .app bundle, or the source folder."""
+    if not getattr(sys, "frozen", False):
+        return Path(__file__).resolve().parent
+    exe = Path(sys.executable)
+    return exe.parents[2] if IS_MAC and exe.parent.name == "MacOS" else exe
+
+
+def uninstall():
+    """Remove everything Screen Intel created on this computer; returns a description of each removed item.
+
+    That is the API key in the credential store and the settings folder, and on macOS also the preferences
+    and window state macOS keeps for the app and its privacy permissions. The app itself and a .env the user
+    put next to it are left for the user to delete.
+    """
+    removed = []
+    if delete_secret():
+        removed.append("Your API key in " + ("the Keychain" if IS_MAC else "Windows Credential Manager"))
+    path = user_config_file()
+    if path.is_file():
+        path.unlink()
+        removed.append(f"Your settings: {path}")
+    try:
+        path.parent.rmdir()  # only if empty: never delete files we didn't create
+    except OSError:
+        pass
+    if IS_MAC:
+        library = Path.home() / "Library"
+        subprocess.run(["defaults", "delete", BUNDLE_ID], capture_output=True, timeout=10)
+        for leftover in (
+            library / "Preferences" / f"{BUNDLE_ID}.plist",
+            library / "Saved Application State" / f"{BUNDLE_ID}.savedState",
+            library / "Caches" / BUNDLE_ID,
+            library / "HTTPStorages" / BUNDLE_ID,
+        ):
+            if leftover.is_dir():
+                shutil.rmtree(leftover, ignore_errors=True)
+            elif leftover.exists():
+                leftover.unlink()
+            else:
+                continue
+            removed.append(str(leftover))
+        for service in ("ScreenCapture", "Accessibility", "ListenEvent"):
+            subprocess.run(["tccutil", "reset", service, BUNDLE_ID], capture_output=True, timeout=10)
+        removed.append("The Screen Recording, Accessibility and Input Monitoring permissions")
+    return removed
+
+
 def load():
-    """Settings from, lowest to highest priority: .env next to the app, the settings file, environment."""
+    """Settings from, lowest to highest priority: .env next to the app, the settings file, the credential
+    store (API key only), environment. A key still in the settings file (older versions) moves to the store.
+    """
     values = {}
     for path in (app_dir() / ".env", user_config_file()):
         if path.is_file():
             values.update({k: v for k, v in dotenv_values(path).items() if v})
+    config = user_config_file()
+    file_key = dotenv_values(config).get("GEMINI_API_KEY") if config.is_file() else None
+    if file_key and file_key != PLACEHOLDER_KEY and write_secret(file_key):
+        set_key(str(config), "GEMINI_API_KEY", "")  # moved to the credential store: no plain-text copy left
+    secret = read_secret()
+    if secret:
+        values["GEMINI_API_KEY"] = secret
     values.update({k: os.environ[k] for k in _ENV_NAMES if os.environ.get(k)})
 
     key = values.get("GEMINI_API_KEY") or values.get("GOOGLE_API_KEY")
@@ -154,7 +268,10 @@ def save(settings):
     path = user_config_file()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.touch()
-    set_key(str(path), "GEMINI_API_KEY", settings["api_key"] or "")
+    _lock_down(path)
+    key = settings["api_key"] or ""
+    # Only fall back to the (user-only) file when the system has no credential store.
+    set_key(str(path), "GEMINI_API_KEY", "" if write_secret(key) else key)
     set_key(str(path), "GEMINI_MODEL", settings["model"])
     set_key(str(path), "FONT_SIZE", str(settings["font_size"]))
     set_key(str(path), "FONT_FAMILY", settings["font_family"])
@@ -398,18 +515,34 @@ class SettingsWindow:
         buttons.pack(anchor="w")
         ui.Button(buttons, "Show welcome tour", lambda: self._run("welcome"), "secondary").pack(side="left")
         ui.Button(buttons, "Restart", lambda: self._run("restart"), "secondary").pack(side="left", padx=8)
-        ui.Button(buttons, "Quit Screen Intel", lambda: self._run("quit"), "danger").pack(side="left")
+        ui.Button(buttons, "Quit Screen Intel", lambda: self._run("quit"), "secondary").pack(side="left")
 
         box = ui.card(page)
         box.pack(fill="x", pady=(14, 0))
         c = box.inner
         ui.label(c, "Leaves nothing behind", 11, weight="bold").pack(anchor="w")
+        store = "Keychain" if IS_MAC else "Windows Credential Manager"
         text = (
             "No services, startup entries or background helpers. When you turn it off it is gone. "
-            f"The only file it keeps is your settings:\n{user_config_file()}"
+            f"It keeps only your API key (in the {store}) and your settings:\n{user_config_file()}"
         )
-        ui.label(c, text, 10, ui.MUTED, wraplength=470).pack(anchor="w", pady=(4, 0))
+        ui.label(c, text, 10, ui.MUTED, wraplength=470).pack(anchor="w", pady=(4, 12))
+        ui.Button(c, "Uninstall Screen Intel…", self._uninstall, "danger").pack(anchor="w")
         return page
+
+    def _uninstall(self):
+        from tkinter import messagebox
+
+        app = "ScreenIntel.app" if IS_MAC else "ScreenIntel.exe"
+        sure = messagebox.askyesno(
+            "Uninstall Screen Intel?",
+            "This deletes your API key, your settings and everything else Screen Intel saved on this "
+            f"computer, then turns the app off. You delete {app} yourself afterwards.\n\n"
+            "This can't be undone.",
+            icon="warning", default="no", parent=self.win,
+        )
+        if sure:
+            self._run("uninstall")
 
     # Appearance
 

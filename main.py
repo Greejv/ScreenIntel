@@ -110,6 +110,7 @@ class App:
         self.answerer = self._make_answerer()
         self.settings_window = None
         self.welcome_window = None
+        self.uninstalled = False
 
         self.root = tk.Tk()
         self.root.report_callback_exception = self._on_tk_error
@@ -190,6 +191,8 @@ class App:
         self.root.after(50, self._poll)
 
     def _handle(self, name, value):
+        if self.uninstalled and name != "quit":
+            return  # only quitting is left; anything else could save settings again
         if name in CAPTURE_MODES:
             self._capture(CAPTURE_MODES[name])
         elif name == "toggle":
@@ -231,7 +234,8 @@ class App:
             return
         # Pause our shortcuts so pressing them in Settings records them (and they don't count as taken).
         self._stop_hotkeys()
-        actions = {"welcome": self.open_welcome, "restart": self.restart, "quit": self.quit}
+        actions = {"welcome": self.open_welcome, "restart": self.restart, "quit": self.quit,
+                   "uninstall": self.uninstall}
         self.settings_window = settings.SettingsWindow(
             self.root, self.settings, self._apply_settings, self._settings_closed, actions
         )
@@ -253,6 +257,28 @@ class App:
             self.tray.title = f"Screen Intel · {capture} to answer"
         self.overlay.set_text("Settings saved. " + self._status_message())
         self.overlay.set_visible(True)
+
+    def uninstall(self):
+        """Delete everything the app saved, tell the user to delete the app itself, then quit."""
+        self._stop_hotkeys()
+        self.uninstalled = True
+        removed = settings.uninstall()
+        self.overlay.set_visible(False)
+        app = settings.app_location()
+        listed = "\n".join(f"•  {item}" for item in removed) or "•  Nothing had been saved yet."
+        body = (
+            f"Removed:\n{listed}\n\nLast step: delete {app.name} yourself once the app has closed "
+            f"(and a .env file next to it, if you made one):\n{app}"
+        )
+        where = "Finder" if IS_MAC else "Explorer"
+
+        def show_and_quit():
+            ui.reveal(app)
+            self.quit()
+
+        ui.notice(self.root, "Screen Intel uninstalled", "Screen Intel is almost gone", body, [
+            ("Quit", self.quit, "secondary"), (f"Show in {where} and quit", show_and_quit, "primary"),
+        ], on_close=self.quit)
 
     def _capture(self, mode):
         if self.busy:

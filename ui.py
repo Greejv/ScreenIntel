@@ -309,3 +309,38 @@ def pick_screen_color(parent, on_done):
     top.bind("<Escape>", lambda e: finish(None))
     bring_to_front(top)
     c.focus_set()
+
+
+def reveal(path):
+    """Show a file in Explorer / Finder with it selected."""
+    import subprocess
+
+    if sys.platform == "win32":
+        subprocess.Popen(f'explorer /select,"{path}"')  # explorer needs the quotes after the comma
+    elif IS_MAC:
+        subprocess.Popen(["open", "-R", str(path)])
+
+
+def notice(root, title, heading, body, buttons, on_close):
+    """A small dark window with a heading, text and buttons [(text, command, kind)]. Closing it calls
+    on_close."""
+    win = tk.Toplevel(root, bg=BG, padx=32, pady=28)
+    win.title(title)
+    win.resizable(False, False)
+    win.attributes("-topmost", True)
+    win.protocol("WM_DELETE_WINDOW", on_close)
+    set_window_icon(win)
+    dark_title_bar(win)
+    label(win, heading, 16, weight="bold").pack(anchor="w")
+    label(win, body, 10, MUTED, wraplength=460).pack(anchor="w", pady=(8, 20))
+    row = tk.Frame(win, bg=BG)
+    row.pack(anchor="e")
+    for text, command, kind in buttons:
+        Button(row, text, command, kind).pack(side="left", padx=(8, 0))
+    win.update_idletasks()
+    x = (win.winfo_screenwidth() - win.winfo_reqwidth()) // 2
+    y = (win.winfo_screenheight() - win.winfo_reqheight()) // 3
+    win.geometry(f"+{x}+{y}")
+    bring_to_front(win)
+    fade_in(win)
+    return win

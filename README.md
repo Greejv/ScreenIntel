@@ -27,7 +27,7 @@ Screen Intel looks at your screen, finds the quiz question, and shows the shorte
 | 👻 **Invisible window** | Only the answer text is visible. No border, no background, always on top. |
 | 🧩 **Many question types** | Multiple choice, fill in the blank, dropdowns, drag and drop, matching, open questions. |
 | 🧹 **Ignores clutter** | Browser tabs, taskbar and other windows around the question don't confuse it. |
-| 🔒 **Your key stays with you** | Your API key is saved only on your computer. |
+| 🔒 **Your key stays with you** | Your API key is kept in Windows Credential Manager or the macOS Keychain, never in a plain file, and never leaves your computer except to talk to Gemini. |
 
 **Example answers:**
 
@@ -261,10 +261,12 @@ That's normal. The single `.exe` unpacks itself on each launch.
 | Windows | `%APPDATA%\ScreenIntel\.env` |
 | macOS | `~/Library/Application Support/ScreenIntel/.env` |
 
+Your **API key** is not in this file: it's stored in **Windows Credential Manager** (entry `ScreenIntel`) or the **macOS Keychain** (item `ScreenIntel`), encrypted by your system and readable only when you're signed in. Older versions kept it in the file; the first start of v1.7.0 moves it over and blanks it in the file. On macOS the settings file is readable only by your user. If no credential store is available, the key stays in the settings file.
+
 The Settings window writes this file. You can also put a `.env` file next to the app; anything the Settings window saved takes priority over it, and environment variables beat both. Available settings:
 
 ```env
-GEMINI_API_KEY=your_key_here
+GEMINI_API_KEY=your_key_here         # only in a .env next to the app, or when there's no credential store
 GEMINI_MODEL=gemini-3.5-flash-lite   # optional, this is the default
 FONT_SIZE=14                         # optional, 4 to 72
 FONT_FAMILY=Georgia                  # optional, empty = system font
@@ -278,11 +280,11 @@ ONBOARDED=1                          # set after the welcome tour; remove it to 
 
 Screen Intel installs nothing. It runs no services, adds no startup entries or registry keys, and nothing of it keeps running after you turn it off (`Ctrl` + `Shift` + `X` / `⌃` + `⌥` + `X`, tray or menu bar → Quit, or `Cmd` + `Q`).
 
-The only file it keeps is the settings file from the table above. While it runs on Windows, the `.exe` unpacks itself into a temporary `_MEI...` folder in `%TEMP%`, which is deleted automatically when the app turns off. It's only left behind if the app is force-killed (e.g. from Task Manager).
+It keeps only two things: your API key in the credential store and the settings file from the table above (on macOS, macOS itself also keeps the app's permissions and some window state). While it runs on Windows, the `.exe` unpacks itself into a temporary `_MEI...` folder in `%TEMP%`, which is deleted automatically when the app turns off. It's only left behind if the app is force-killed (e.g. from Task Manager).
 
 Every build is checked automatically: the app must start, turn itself off, exit cleanly and leave no temporary files.
 
-**To uninstall:** delete `ScreenIntel.exe` (or `ScreenIntel.app`) and the `ScreenIntel` settings folder.
+**To uninstall:** open **Settings → Background → Uninstall Screen Intel…**. It deletes your API key, your settings folder and, on macOS, the app's preferences, saved window state and its Screen Recording / Accessibility / Input Monitoring permissions. Then it shows you where `ScreenIntel.exe` (or `ScreenIntel.app`) is so you can delete it. If you put a `.env` file next to the app yourself, delete that too.
 </details>
 
 <details>

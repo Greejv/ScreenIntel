@@ -78,6 +78,7 @@ def test_settings_roundtrip(tmp_path, monkeypatch):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setattr(settings, "app_dir", lambda: tmp_path / "app")
     monkeypatch.setattr(settings, "user_config_file", lambda: tmp_path / "user" / ".env")
+    monkeypatch.setattr(settings, "_keyring", lambda: None)  # no credential store: key goes to the file
 
     defaults = {action: default for action, (default, _) in settings.ACTIONS.items()}
     fresh = {
@@ -183,3 +184,48 @@ def test_mac_listener_matches_by_key_and_fires_once():
     listener._release(alt)
     listener._press(q)  # Control+Q alone is not the shortcut
     assert hits == [1, 1]
+
+
+class FakeKeyring:
+    def __init__(self):
+        self.store = {}
+
+    def get_password(self, service, user):
+        return self.store.get((service, user))
+
+    def set_password(self, service, user, value):
+        self.store[(service, user)] = value
+
+    def delete_password(self, service, user):
+        del self.store[(service, user)]
+
+
+def test_key_lives_in_credential_store_and_uninstall_removes_everything(tmp_path, monkeypatch):
+    import settings
+
+    for name in settings._ENV_NAMES:
+        monkeypatch.delenv(name, raising=False)
+    config = tmp_path / "user" / ".env"
+    monkeypatch.setattr(settings, "app_dir", lambda: tmp_path / "app")
+    monkeypatch.setattr(settings, "user_config_file", lambda: config)
+    fake = FakeKeyring()
+    monkeypatch.setattr(settings, "_keyring", lambda: fake)
+
+    config.parent.mkdir()
+    config.write_text("GEMINI_API_KEY=old-plain-key\nFONT_SIZE=20\n")  # written by an older version
+    loaded = settings.load()
+    assert loaded["api_key"] == "old-plain-key"
+    assert "old-plain-key" not in config.read_text()  # moved into the credential store
+    assert fake.store == {(settings.KEYRING_SERVICE, settings.KEYRING_USER): "old-plain-key"}
+
+    settings.save(dict(loaded, api_key="new-key"))
+    assert "new-key" not in config.read_text()
+    assert settings.load()["api_key"] == "new-key"
+    if sys.platform != "win32":
+        assert config.stat().st_mode & 0o077 == 0  # only the user can read it
+
+    removed = settings.uninstall()
+    assert not config.exists() and not config.parent.exists()
+    assert fake.store == {}
+    assert len(removed) >= 2
+    assert settings.load()["api_key"] is None
