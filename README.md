@@ -21,7 +21,8 @@ Screen Intel looks at your screen, finds the quiz question, and shows the shorte
 
 | | |
 |---|---|
-| ⌨️ **One shortcut** | Press `Ctrl` + `Shift` + `Q` and the whole screen is sent to Google Gemini. |
+| ⌨️ **One shortcut** | Press `Ctrl` + `Shift` + `Q` (Mac: `⌃` + `⌥` + `Q`) and the whole screen is sent to Google Gemini. |
+| 🎨 **Make it yours** | Pick the font, size and color of the answer, even a color picked straight from your screen. |
 | 🎯 **Short answers** | Just the letter, the word, or one short sentence. No explanations. |
 | 👻 **Invisible window** | Only the answer text is visible. No border, no background, always on top. |
 | 🧩 **Many question types** | Multiple choice, fill in the blank, dropdowns, drag and drop, matching, open questions. |
@@ -61,10 +62,10 @@ Screen Intel uses Google's Gemini AI. You need your own key. It's free and takes
 2. Move it somewhere permanent, for example a `ScreenIntel` folder in Documents.
 3. Double-click **`ScreenIntel.exe`**.
 4. If Windows shows **"Windows protected your PC"**, click **More info** → **Run anyway**. This appears because the app isn't code-signed.
-5. The **Settings** window opens. **Paste your API key** and click **Save**.
-6. After a few seconds you'll see **"Ready. Ctrl+Shift+Q to answer."** in the top-left corner. 🎉
+5. The **welcome tour** opens. Click through it and **paste your API key** when it asks.
+6. You'll see **"Ready. Ctrl+Shift+Q to answer."** in the top-left corner. 🎉
 
-A blue dot appears in the system tray (bottom-right, you may need to click `^`). Right-click it for **Show / hide**, **Settings...** and **Quit**, or press `Ctrl` + `Shift` + `X` to turn it off.
+A lens icon appears in the system tray (bottom-right, you may need to click `^`). Click it to show or hide the answer; right-click it for **Settings…**, **Welcome tour**, **Restart** and **Quit**. Or press `Ctrl` + `Shift` + `X` to turn it off.
 
 > [!TIP]
 > **Start automatically with Windows:** press `Win` + `R`, type `shell:startup`, press Enter, and put a shortcut to `ScreenIntel.exe` in that folder.
@@ -81,37 +82,37 @@ A blue dot appears in the system tray (bottom-right, you may need to click `^`).
    ```
    This removes the "downloaded from the internet" flag, so macOS opens it without asking.
    </details>
-4. The **Settings** window opens. Paste your API key and click **Save**.
+4. The **welcome tour** opens. Paste your API key when it asks. It also has buttons that open the two permission pages:
 5. Give it two permissions in **System Settings** → **Privacy & Security**:
    - **Screen Recording** → turn on **ScreenIntel** (so it can see the question)
    - **Accessibility** → turn on **ScreenIntel** (so the shortcuts work)
 6. **Quit and reopen** the app so the permissions take effect.
 
-Open **Settings** any time by clicking the Dock icon, or from the app menu (**ScreenIntel → Settings...**, `Cmd` + `,`). Turn it off with `Ctrl` + `Shift` + `X`, from the Dock icon, or with `Cmd` + `Q`.
+Screen Intel puts a **lens icon in the menu bar** (top right). Click it for **Show / hide answer**, **Settings…**, **Welcome tour**, **Restart** and **Quit**. Clicking the Dock icon or `Cmd` + `,` also opens Settings. Turn it off with `⌃` + `⌥` + `X`, from the menu bar icon, or with `Cmd` + `Q`.
 
 ---
 
 ## 🚀 Step 3: Use it
 
 1. Open your quiz so the question is visible on screen.
-2. Press **`Ctrl` + `Shift` + `Q`**.
+2. Press **`Ctrl` + `Shift` + `Q`** (Mac: **`⌃` + `⌥` + `Q`**, that's Control + Option + Q).
 3. You'll see `...` while it thinks, then the answer appears, usually within 2 to 4 seconds.
 
 ### ⌨️ Shortcuts
 
-| Shortcut | What it does |
-|:--|:--|
-| `Ctrl` + `Shift` + `Q` | 📸 Read the screen and answer |
-| `Ctrl` + `Shift` + `D` | 📝 Detailed answer: the answer plus a short explanation |
-| `Ctrl` + `Shift` + `F` | 🧮 Just the formula needed to calculate it |
-| `Ctrl` + `Shift` + `G` | 🪜 Short step-by-step working, ending with the answer |
-| `Ctrl` + `Shift` + `H` | 👁️ Hide / show the answer |
-| `Ctrl` + `Shift` + `↑` | 🔠 Bigger text |
-| `Ctrl` + `Shift` + `↓` | 🔡 Smaller text |
-| `Ctrl` + `Shift` + `R` | 🔄 Restart the app |
-| `Ctrl` + `Shift` + `X` | ⏻ Turn the app off |
+| Windows | Mac | What it does |
+|:--|:--|:--|
+| `Ctrl` + `Shift` + `Q` | `⌃` + `⌥` + `Q` | 📸 Read the screen and answer |
+| `Ctrl` + `Shift` + `D` | `⌃` + `⌥` + `D` | 📝 Detailed answer: the answer plus a short explanation |
+| `Ctrl` + `Shift` + `F` | `⌃` + `⌥` + `F` | 🧮 Just the formula needed to calculate it |
+| `Ctrl` + `Shift` + `G` | `⌃` + `⌥` + `G` | 🪜 Short step-by-step working, ending with the answer |
+| `Ctrl` + `Shift` + `H` | `⌃` + `⌥` + `H` | 👁️ Hide / show the answer |
+| `Ctrl` + `Shift` + `↑` | `⌃` + `⌥` + `=` | 🔠 Bigger text |
+| `Ctrl` + `Shift` + `↓` | `⌃` + `⌥` + `-` | 🔡 Smaller text |
+| `Ctrl` + `Shift` + `R` | `⌃` + `⌥` + `R` | 🔄 Restart the app |
+| `Ctrl` + `Shift` + `X` | `⌃` + `⌥` + `X` | ⏻ Turn the app off |
 
-These are the defaults, and the same ones work on Mac (use `Ctrl`, not `Cmd`). You can change any of them in **Settings**.
+These are the defaults. On Mac they use **Control + Option** (`⌃⌥`), which no macOS shortcut uses: `Cmd` combinations belong to the app in front, and `Control` + letter moves the cursor in text fields. You can change any of them in **Settings**.
 
 ### 🖱️ Moving the answer
 
@@ -119,14 +120,14 @@ Click directly **on the text** and drag it wherever you like. Clicks on the empt
 
 ### ⚙️ Settings
 
-Open Settings from the **tray icon** (Windows) or by **clicking the Dock icon** / **ScreenIntel → Settings...** (Mac). You can change:
+Open Settings from the **tray icon** (Windows) or the **menu bar icon** / Dock icon / `Cmd` + `,` (Mac). It has four pages:
 
-| Setting | What it does |
+| Page | What you can change |
 |:--|:--|
-| **Gemini API key** | Your key. Tick **Show** to check it, or click **Get a free key**. |
-| **Model** | Which Gemini model answers. Leave the default unless it stops working. |
-| **Text size** | Starting size of the answer text (4 to 72). |
-| **Shortcuts** | Click the box next to an action and **press the keys** you want, e.g. `Ctrl` + `Alt` + `T`. Use at least one of Ctrl, Shift, Alt or Win/Cmd plus a letter, number, arrow, space or F1–F12. `Esc` cancels. Screen Intel refuses system shortcuts (like `Ctrl` + `C` or `Win` + `D`), shortcuts used twice, and on Windows any shortcut another app already owns. **Reset shortcuts** restores the defaults. Your shortcuts are paused while Settings is open. |
+| **General** | Your **Gemini API key** (click **Show** to check it, or **Get a free key**) and the **Model**. Leave the model on the default unless it stops working. |
+| **Appearance** | The answer's **font** (system font or a few others), **size** (4 to 72) and **color**: pick a swatch, choose **Custom…**, or click **Pick a color from the screen** and then click any pixel on your screen (a magnifier shows exactly which one). A live preview shows the result. |
+| **Background** | Where to find the running app, **Show welcome tour**, **Restart** and **Quit**. |
+| **Shortcuts** | Click the box next to an action and **press the keys** you want, e.g. `Ctrl` + `Alt` + `T`. Use at least one of Ctrl, Shift, Alt/Option or Win/Cmd plus a letter, number, arrow, `=`, `-`, space or F1–F12. `Esc` cancels. Screen Intel refuses system shortcuts (like `Ctrl` + `C`, `Win` + `D` or `Cmd` + `Space`), shortcuts used twice, and on Windows any shortcut another app already owns. **Reset to defaults** restores the defaults. Your shortcuts are paused while Settings is open. |
 
 Click **Save** and the changes apply immediately, no restart needed.
 
@@ -151,7 +152,7 @@ Click **Save** and the changes apply immediately, no restart needed.
 <details>
 <summary><b>"No Gemini API key. Open Settings from ..."</b></summary>
 
-Open **Settings** (tray icon on Windows, Dock icon on Mac), paste your key and click **Save**.
+Open **Settings** (tray icon on Windows, menu bar icon on Mac), paste your key and click **Save**.
 </details>
 
 <details>
@@ -163,7 +164,7 @@ Open **Settings**, paste the correct key and click **Save**. Make sure you copie
 <details>
 <summary><b>"Error: ... 503 / UNAVAILABLE" or "429 / RESOURCE_EXHAUSTED"</b></summary>
 
-Google's servers are busy or you hit the free limit. The app already retries automatically. Wait a minute and press `Ctrl` + `Shift` + `Q` again.
+Google's servers are busy or you hit the free limit. The app already retries automatically. Wait a minute and press the shortcut again.
 </details>
 
 <details>
@@ -175,7 +176,7 @@ Another program is using that shortcut (common ones: screenshot tools, game over
 <details>
 <summary><b>Nothing happens when I press the shortcut (Mac)</b></summary>
 
-Check **System Settings → Privacy & Security → Accessibility** and **Input Monitoring**, make sure **ScreenIntel** is turned on, then quit and reopen the app.
+Check **System Settings → Privacy & Security → Accessibility** and **Input Monitoring**, make sure **ScreenIntel** is turned on, then quit and reopen the app. Since v1.6.0 the Mac shortcuts use **Control + Option** (`⌃⌥Q`), not Control + Shift.
 </details>
 
 <details>
@@ -187,7 +188,7 @@ Make sure **Screen Recording** is allowed for ScreenIntel. Without it macOS only
 <details>
 <summary><b>I can't see the answer text</b></summary>
 
-Press `Ctrl` + `Shift` + `H` in case it's hidden, and `Ctrl` + `Shift` + `↑` to make it bigger. It starts in the top-left corner of the main screen.
+Press `Ctrl` + `Shift` + `H` (Mac: `⌃` + `⌥` + `H`) in case it's hidden, and `Ctrl` + `Shift` + `↑` (Mac: `⌃` + `⌥` + `=`) to make it bigger. It starts in the top-left corner of the main screen. If you picked a dark color in **Settings → Appearance**, it may be hard to see on a dark page.
 </details>
 
 <details>
@@ -214,13 +215,16 @@ The Settings window writes this file. You can also put a `.env` file next to the
 GEMINI_API_KEY=your_key_here
 GEMINI_MODEL=gemini-3.5-flash-lite   # optional, this is the default
 FONT_SIZE=14                         # optional, 4 to 72
+FONT_FAMILY=Georgia                  # optional, empty = system font
+TEXT_COLOR=#ffffff                   # optional, answer color
+ONBOARDED=1                          # set after the welcome tour; remove it to see the tour again
 ```
 </details>
 
 <details>
 <summary><b>What the app leaves on your computer, and how to uninstall</b></summary>
 
-Screen Intel installs nothing. It runs no services, adds no startup entries or registry keys, and nothing of it keeps running after you turn it off (`Ctrl` + `Shift` + `X`, tray → Quit, or `Cmd` + `Q`).
+Screen Intel installs nothing. It runs no services, adds no startup entries or registry keys, and nothing of it keeps running after you turn it off (`Ctrl` + `Shift` + `X` / `⌃` + `⌥` + `X`, tray or menu bar → Quit, or `Cmd` + `Q`).
 
 The only file it keeps is the settings file from the table above. While it runs on Windows, the `.exe` unpacks itself into a temporary `_MEI...` folder in `%TEMP%`, which is deleted automatically when the app turns off. It's only left behind if the app is force-killed (e.g. from Task Manager).
 

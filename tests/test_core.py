@@ -18,9 +18,14 @@ def test_parse_windows_shortcuts():
         hotkeys.parse("ctrl+f13")
 
 
-def test_pynput_shortcuts():
-    assert hotkeys.to_pynput("ctrl+shift+q") == "<ctrl>+<shift>+q"
-    assert hotkeys.to_pynput("ctrl+shift+down") == "<ctrl>+<shift>+<down>"
+def test_mac_key_names():
+    assert hotkeys.mac_key_name("q", 0x0C) == "q"
+    assert hotkeys.mac_key_name("œ", 0x0C) == "q"  # Option+Q types œ: match by key position
+    assert hotkeys.mac_key_name("\x11", 0x0C) == "q"  # Control+Q
+    assert hotkeys.mac_key_name(None, 0x7E) == "up"
+    assert hotkeys.mac_key_name("≠", 0x18) == "="
+    assert hotkeys.mac_modifier("ctrl_l") == "ctrl" and hotkeys.mac_modifier("cmd_r") == "win"
+    assert hotkeys.mac_modifier("up") is None
 
 
 def make_answerer(replies):
@@ -75,9 +80,11 @@ def test_settings_roundtrip(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "user_config_file", lambda: tmp_path / "user" / ".env")
 
     defaults = {action: default for action, (default, _) in settings.ACTIONS.items()}
-    assert settings.load() == {
-        "api_key": None, "model": settings.DEFAULT_MODEL, "font_size": 14, "shortcuts": defaults
+    fresh = {
+        "api_key": None, "model": settings.DEFAULT_MODEL, "font_size": 14, "font_family": "",
+        "text_color": "#ffffff", "shortcuts": defaults, "onboarded": False,
     }
+    assert settings.load() == fresh
 
     (tmp_path / "app").mkdir()
     (tmp_path / "app" / ".env").write_text("GEMINI_API_KEY=paste_your_key_here\nFONT_SIZE=999\n")
@@ -85,8 +92,14 @@ def test_settings_roundtrip(tmp_path, monkeypatch):
     assert settings.load()["font_size"] == settings.MAX_FONT
 
     custom = dict(defaults, capture="alt+f2")
-    settings.save({"api_key": "abc", "model": "m", "font_size": 9, "shortcuts": custom})
-    assert settings.load() == {"api_key": "abc", "model": "m", "font_size": 9, "shortcuts": custom}
+    saved = dict(fresh, api_key="abc", model="m", font_size=9, font_family="Georgia", text_color="#ffd60a",
+                 shortcuts=custom, onboarded=True)
+    settings.save(saved)
+    assert settings.load() == saved
+
+    with (tmp_path / "user" / ".env").open("a") as f:
+        f.write("TEXT_COLOR=not-a-color\n")
+    assert settings.load()["text_color"] == "#ffffff"
 
     with (tmp_path / "user" / ".env").open("a") as f:
         f.write("SHORTCUT_TOGGLE=ctrl+banana\n")  # broken by hand
@@ -109,13 +122,30 @@ def test_shortcut_validation():
     assert all(c not in hotkeys.SYSTEM_SHORTCUTS for c in good.values())  # defaults are safe
 
 
+def test_mac_defaults_avoid_macos_shortcuts():
+    import settings
+
+    defaults = settings.MAC_DEFAULTS
+    assert set(defaults) == set(settings.ACTION_LABELS) == set(settings.WINDOWS_DEFAULTS)
+    assert len(set(defaults.values())) == len(defaults)
+    for combo in defaults.values():
+        assert combo not in hotkeys._MAC_SYSTEM
+        assert hotkeys.parse(combo)[0]  # valid, with a modifier
+        assert "win" not in combo  # Cmd shortcuts belong to the app in front
+    assert "ctrl+shift+f" in hotkeys._MAC_SYSTEM  # old Mac defaults reset to the new ones on load
+
+
 def test_shortcut_text_helpers():
     import settings
 
     assert settings.normalize_shortcut(" Control + Shift + F5 ") == "ctrl+shift+f5"
     assert settings.normalize_shortcut("cmd+option+a") == "alt+win+a"  # canonical modifier order
     assert settings.normalize_shortcut("shift+ctrl+q") == "ctrl+shift+q"
-    assert settings.shortcut_label("ctrl+shift+up") == "Ctrl+Shift+Up"
+    assert settings.shortcut_label("ctrl+shift+up", mac=False) == "Ctrl+Shift+Up"
+    assert settings.shortcut_label("ctrl+alt+q", mac=True) == "⌃⌥Q"
+    assert settings.shortcut_label("ctrl+shift+alt+win+up", mac=True) == "⌃⌥⇧⌘↑"
+    assert settings.normalize_shortcut("Ctrl+Option+=") == "ctrl+alt+="
+    assert hotkeys.parse("ctrl+alt+-") == (hotkeys.MOD_CONTROL | hotkeys.MOD_ALT, 0xBD)
     assert hotkeys.parse("alt+f12") == (hotkeys.MOD_ALT, 0x7B)
 
 
@@ -131,3 +161,25 @@ def test_recording_helpers():
         assert hotkeys.key_from_event("Q", 0) == "q"
         assert hotkeys.key_from_event("F5", 0) == "f5"
         assert hotkeys.key_from_event("Escape", 0) is None
+        assert hotkeys.key_from_event("equal", 0) == "="
+        assert hotkeys.key_from_event("underscore", 0) == "-"
+
+
+def test_mac_listener_matches_by_key_and_fires_once():
+    from types import SimpleNamespace as K
+
+    hits = []
+    listener = object.__new__(hotkeys.MacHotkeys)  # skip __init__, which needs pynput on a Mac
+    listener._bindings, listener._held, listener._fired = {"ctrl+alt+q": lambda: hits.append(1)}, set(), set()
+    ctrl, alt = K(name="ctrl_l", value=K(vk=0x3B)), K(name="alt", value=K(vk=0x3A))
+    q = K(char="œ", vk=0x0C)  # Option+Q types œ
+    for key in (ctrl, alt, q, q):  # the second q is key repeat
+        listener._press(key)
+    assert hits == [1]
+    listener._release(q)
+    listener._press(q)
+    assert hits == [1, 1]
+    listener._release(q)
+    listener._release(alt)
+    listener._press(q)  # Control+Q alone is not the shortcut
+    assert hits == [1, 1]

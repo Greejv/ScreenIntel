@@ -1,38 +1,60 @@
 """User settings: where they are stored, and the Settings window."""
 
 import os
+import re
 import sys
 import tkinter as tk
-import webbrowser
 from pathlib import Path
-from tkinter import ttk
 
 from dotenv import dotenv_values, set_key
 
 import hotkeys
+import overlay
+import ui
 
 IS_MAC = sys.platform == "darwin"
 DEFAULT_MODEL = "gemini-3.5-flash-lite"
 DEFAULT_FONT_SIZE = 14
+DEFAULT_COLOR = "#ffffff"
 MIN_FONT, MAX_FONT = 4, 72
 PLACEHOLDER_KEY = "paste_your_key_here"
 KEY_URL = "https://aistudio.google.com/apikey"
-# action: (default shortcut, description shown in Settings)
-ACTIONS = {
-    "capture": ("ctrl+shift+q", "Answer the question on screen"),
-    "capture_detailed": ("ctrl+shift+d", "Answer with a short explanation"),
-    "capture_formula": ("ctrl+shift+f", "Just the formula to calculate it"),
-    "capture_steps": ("ctrl+shift+g", "Short step-by-step working"),
-    "toggle": ("ctrl+shift+h", "Show / hide the answer"),
-    "bigger": ("ctrl+shift+up", "Bigger text"),
-    "smaller": ("ctrl+shift+down", "Smaller text"),
-    "restart": ("ctrl+shift+r", "Restart"),
-    "quit": ("ctrl+shift+x", "Turn off"),
+# Swatches offered for the answer color (besides picking one from the screen).
+COLORS = ("#ffffff", "#ffd60a", "#32d74b", "#64d2ff", "#bf5af2", "#ff6482", "#ff9f0a", "#9a9a9a", "#111111")
+
+# action: description shown in Settings
+ACTION_LABELS = {
+    "capture": "Answer the question on screen",
+    "capture_detailed": "Answer with a short explanation",
+    "capture_formula": "Just the formula to calculate it",
+    "capture_steps": "Short step-by-step working",
+    "toggle": "Show / hide the answer",
+    "bigger": "Bigger text",
+    "smaller": "Smaller text",
+    "restart": "Restart",
+    "quit": "Turn off",
 }
-_ENV_NAMES = ("GEMINI_API_KEY", "GOOGLE_API_KEY", "GEMINI_MODEL", "FONT_SIZE") + tuple(
-    f"SHORTCUT_{a.upper()}" for a in ACTIONS
-)
+WINDOWS_DEFAULTS = {
+    "capture": "ctrl+shift+q", "capture_detailed": "ctrl+shift+d", "capture_formula": "ctrl+shift+f",
+    "capture_steps": "ctrl+shift+g", "toggle": "ctrl+shift+h", "bigger": "ctrl+shift+up",
+    "smaller": "ctrl+shift+down", "restart": "ctrl+shift+r", "quit": "ctrl+shift+x",
+}
+# macOS: Control+Option, which no macOS shortcut uses (Control+letter edits text, Cmd belongs to apps,
+# Control+arrows switch desktops).
+MAC_DEFAULTS = {
+    "capture": "ctrl+alt+q", "capture_detailed": "ctrl+alt+d", "capture_formula": "ctrl+alt+f",
+    "capture_steps": "ctrl+alt+g", "toggle": "ctrl+alt+h", "bigger": "ctrl+alt+=",
+    "smaller": "ctrl+alt+-", "restart": "ctrl+alt+r", "quit": "ctrl+alt+x",
+}
+# action: (default shortcut on this platform, description shown in Settings)
+_DEFAULTS = MAC_DEFAULTS if IS_MAC else WINDOWS_DEFAULTS
+ACTIONS = {action: (_DEFAULTS[action], label) for action, label in ACTION_LABELS.items()}
+_ENV_NAMES = (
+    "GEMINI_API_KEY", "GOOGLE_API_KEY", "GEMINI_MODEL", "FONT_SIZE", "FONT_FAMILY", "TEXT_COLOR", "ONBOARDED"
+) + tuple(f"SHORTCUT_{a.upper()}" for a in ACTIONS)
 _MOD_ALIASES = {"control": "ctrl", "option": "alt", "cmd": "win", "command": "win"}
+_MAC_SYMBOLS = {"ctrl": "⌃", "alt": "⌥", "shift": "⇧", "win": "⌘", "up": "↑", "down": "↓", "left": "←",
+                "right": "→", "space": "Space"}
 
 
 def normalize_shortcut(text):
@@ -43,10 +65,15 @@ def normalize_shortcut(text):
     return hotkeys.canonical(set(parts[:-1]), parts[-1])
 
 
-def shortcut_label(combo):
-    """'ctrl+shift+q' -> 'Ctrl+Shift+Q' (macOS shows Cmd for the Windows key)."""
-    names = {"win": "Cmd" if IS_MAC else "Win"}
-    return "+".join(names.get(p, p.upper() if len(p) == 1 else p.capitalize()) for p in combo.split("+"))
+def shortcut_label(combo, mac=IS_MAC):
+    """'ctrl+shift+q' -> 'Ctrl+Shift+Q' on Windows, '⌃⌥Q' for 'ctrl+alt+q' on macOS."""
+    *mods, key = combo.split("+")
+    if mac:
+        order = ("ctrl", "alt", "shift", "win")  # the order macOS menus use
+        return "".join(_MAC_SYMBOLS[m] for m in order if m in mods) + _MAC_SYMBOLS.get(
+            key, key.upper() if len(key) == 1 else key.capitalize()
+        )
+    return "+".join(p.upper() if len(p) == 1 else p.capitalize() for p in mods + [key])
 
 
 def shortcut_errors(shortcuts, check_free=False):
@@ -105,6 +132,7 @@ def load():
         font_size = int(values.get("FONT_SIZE", DEFAULT_FONT_SIZE))
     except ValueError:
         font_size = DEFAULT_FONT_SIZE
+    color = values.get("TEXT_COLOR", DEFAULT_COLOR).lower()
     shortcuts = {
         action: normalize_shortcut(values.get(f"SHORTCUT_{action.upper()}", default))
         for action, (default, _) in ACTIONS.items()
@@ -115,7 +143,10 @@ def load():
         "api_key": None if key == PLACEHOLDER_KEY else key,
         "model": values.get("GEMINI_MODEL") or DEFAULT_MODEL,
         "font_size": max(MIN_FONT, min(MAX_FONT, font_size)),
+        "font_family": values.get("FONT_FAMILY", ""),
+        "text_color": color if re.fullmatch(r"#[0-9a-f]{6}", color) else DEFAULT_COLOR,
         "shortcuts": shortcuts,
+        "onboarded": values.get("ONBOARDED") == "1",
     }
 
 
@@ -126,95 +157,324 @@ def save(settings):
     set_key(str(path), "GEMINI_API_KEY", settings["api_key"] or "")
     set_key(str(path), "GEMINI_MODEL", settings["model"])
     set_key(str(path), "FONT_SIZE", str(settings["font_size"]))
+    set_key(str(path), "FONT_FAMILY", settings["font_family"])
+    set_key(str(path), "TEXT_COLOR", settings["text_color"])
+    set_key(str(path), "ONBOARDED", "1" if settings["onboarded"] else "")
     for action, combo in settings["shortcuts"].items():
         set_key(str(path), f"SHORTCUT_{action.upper()}", combo)
 
 
 class SettingsWindow:
-    """A normal window to edit the API key, model, text size and shortcuts.
+    """The Settings window: a sidebar with General, Appearance, Shortcuts and Background pages.
 
-    Calls on_save(settings) when saved and on_close() whenever the window closes. The app's own
-    shortcuts must be paused while it is open, so pressing them here records them instead.
+    Calls on_save(settings) when saved and on_close() whenever the window closes. `actions` maps
+    "welcome", "restart" and "quit" to callbacks for the buttons on the Background page. The app's
+    own shortcuts must be paused while it is open, so pressing them here records them instead.
     """
 
-    def __init__(self, root, current, on_save, on_close):
-        self._on_save = on_save
-        self._on_close = on_close
-        self.win = tk.Toplevel(root)
+    PAGES = (("general", "⚙", "General"), ("appearance", "◐", "Appearance"),
+             ("shortcuts", "⌨", "Shortcuts"), ("background", "◉", "Background"))
+    WIDTH, HEIGHT, SIDEBAR_W = 780, 600, 196
+
+    def __init__(self, root, current, on_save, on_close, actions):
+        self._on_save, self._on_close, self._actions = on_save, on_close, actions
+        self._current = current
+        self.win = tk.Toplevel(root, bg=ui.BG)
+        self._fonts = overlay.available_fonts(self.win)  # [(name, family)], "" = system font
+        self._system_family = overlay.system_font_family(self.win)
         self.win.title("Screen Intel Settings")
+        self.win.geometry(f"{self.WIDTH}x{self.HEIGHT}")
         self.win.resizable(False, False)
         self.win.attributes("-topmost", True)
         self.win.protocol("WM_DELETE_WINDOW", self.close)
+        ui.set_window_icon(self.win)
+        ui.dark_title_bar(self.win)
 
-        f = ttk.Frame(self.win, padding=16)
-        f.grid(sticky="nsew")
-
-        ttk.Label(f, text="Gemini API key").grid(row=0, column=0, sticky="w")
         self.key = tk.StringVar(value=current["api_key"] or "")
-        self.key_entry = ttk.Entry(f, textvariable=self.key, width=44, show="•")
-        self.key_entry.grid(row=1, column=0, columnspan=2, sticky="we")
-        self.show_key = tk.BooleanVar(value=False)
-        ttk.Checkbutton(f, text="Show", variable=self.show_key, command=self._toggle_key).grid(
-            row=1, column=2, padx=(8, 0)
-        )
-        link = ttk.Label(f, text="Get a free key", foreground="#2a7ae2", cursor="hand2")
-        link.grid(row=2, column=0, sticky="w", pady=(2, 12))
-        link.bind("<Button-1>", lambda e: webbrowser.open(KEY_URL))
-
-        ttk.Label(f, text="Model").grid(row=3, column=0, sticky="w")
         self.model = tk.StringVar(value=current["model"])
-        ttk.Entry(f, textvariable=self.model, width=44).grid(row=4, column=0, columnspan=3, sticky="we")
-        ttk.Label(f, text=f"Default: {DEFAULT_MODEL}", foreground="gray").grid(
-            row=5, column=0, sticky="w", pady=(2, 12)
-        )
-
-        ttk.Label(f, text="Text size").grid(row=6, column=0, sticky="w")
-        self.font_size = tk.IntVar(value=current["font_size"])
-        ttk.Spinbox(f, from_=MIN_FONT, to=MAX_FONT, textvariable=self.font_size, width=6).grid(
-            row=7, column=0, sticky="w", pady=(0, 12)
-        )
-
-        ttk.Label(f, text="Shortcuts").grid(row=8, column=0, sticky="w")
-        hint = (
-            "Click a box, then press the keys you want (Esc cancels). "
-            "Shortcuts are paused while Settings is open."
-        )
-        ttk.Label(f, text=hint, foreground="gray", wraplength=380).grid(
-            row=9, column=0, columnspan=3, sticky="w", pady=(0, 4)
-        )
+        self.font_size = current["font_size"]
+        self.font_family = current["font_family"]
+        self.color = current["text_color"]
         self.shortcuts = {}
-        row = 10
-        for action, (_, label) in ACTIONS.items():
-            ttk.Label(f, text=label).grid(row=row, column=0, sticky="w")
-            field = ShortcutField(f, current["shortcuts"][action], self._check_shortcuts)
-            field.entry.grid(row=row, column=1, columnspan=2, sticky="we", pady=1)
-            self.shortcuts[action] = field
-            row += 1
-        ttk.Button(f, text="Reset shortcuts", command=self._reset_shortcuts).grid(
-            row=row, column=0, sticky="w", pady=(4, 12)
-        )
 
-        self.error = ttk.Label(f, text="", foreground="#c0392b", wraplength=380)
-        self.error.grid(row=row + 1, column=0, columnspan=3, sticky="w")
+        self._build_sidebar()
+        self.content = tk.Frame(self.win, bg=ui.BG)
+        self.content.place(x=self.SIDEBAR_W, y=0, width=self.WIDTH - self.SIDEBAR_W, height=self.HEIGHT - 64)
+        self.pages = {
+            "general": self._page_general(), "appearance": self._page_appearance(),
+            "shortcuts": self._page_shortcuts(), "background": self._page_background(),
+        }
+        self._build_footer()
+        self.page = None
+        self.show_page("general", animate=False)
 
-        buttons = ttk.Frame(f)
-        buttons.grid(row=row + 2, column=0, columnspan=3, sticky="e", pady=(8, 0))
-        ttk.Button(buttons, text="Cancel", command=self.close).pack(side="right")
-        ttk.Button(buttons, text="Save", command=self._save).pack(side="right", padx=(0, 8))
         self.win.bind("<Return>", lambda e: self._save())
         self.win.bind("<Escape>", lambda e: self.close())
-
         self.focus()
+        ui.fade_in(self.win)
+
+    # Layout
+
+    def _build_sidebar(self):
+        bar = tk.Frame(self.win, bg=ui.SIDEBAR)
+        bar.place(x=0, y=0, width=self.SIDEBAR_W, height=self.HEIGHT)
+        head = tk.Frame(bar, bg=ui.SIDEBAR)
+        head.pack(fill="x", padx=18, pady=(22, 26))
+        from PIL import ImageTk
+
+        self._logo = ImageTk.PhotoImage(ui.app_icon(30))
+        tk.Label(head, image=self._logo, bg=ui.SIDEBAR).pack(side="left")
+        ui.label(head, "Screen Intel", 12, weight="bold").pack(side="left", padx=(10, 0))
+
+        self._nav = {}  # page name -> (row, accent bar, icon, title)
+        for name, icon, title in self.PAGES:
+            row = tk.Frame(bar, bg=ui.SIDEBAR, cursor="hand2")
+            row.pack(fill="x", padx=10, pady=1)
+            accent = tk.Frame(row, bg=ui.SIDEBAR, width=3)
+            accent.pack(side="left", fill="y")
+            parts = [row, accent]
+            for text, width in ((icon, 2), (title, 0)):
+                part = tk.Label(row, text=text, bg=ui.SIDEBAR, fg=ui.MUTED, font=ui.font(bar, 11),
+                                width=width, anchor="w", pady=9)
+                part.pack(side="left", padx=(12, 0))
+                parts.append(part)
+            for w in parts:
+                w.bind("<Button-1>", lambda e, n=name: self.show_page(n))
+                w.bind("<Enter>", lambda e, n=name: self._nav_hover(n, True))
+                w.bind("<Leave>", lambda e, n=name: self._nav_hover(n, False))
+            self._nav[name] = parts
+        ui.label(bar, "Shortcuts are paused\nwhile Settings is open.", 9, ui.MUTED).pack(
+            side="bottom", anchor="w", padx=22, pady=20
+        )
+
+    def _nav_hover(self, name, on):
+        if name != self.page:
+            for w in self._nav[name][2:]:
+                w.config(fg=ui.TEXT if on else ui.MUTED)
+
+    def _build_footer(self):
+        foot = tk.Frame(self.win, bg=ui.BG)
+        foot.place(x=self.SIDEBAR_W, y=self.HEIGHT - 64, width=self.WIDTH - self.SIDEBAR_W, height=64)
+        tk.Frame(foot, bg=ui.BORDER, height=1).pack(fill="x")
+        ui.Button(foot, "Save", self._save, "primary", width=96).pack(side="right", padx=(8, 28), pady=13)
+        ui.Button(foot, "Cancel", self.close, "secondary", width=96).pack(side="right", pady=13)
+        self.error = ui.label(foot, "", 9, ui.DANGER, wraplength=320)
+        self.error.pack(side="left", padx=28)
+
+    def _page(self, title, subtitle):
+        page = tk.Frame(self.content, bg=ui.BG, padx=28, pady=24)
+        ui.label(page, title, 18, weight="bold").pack(anchor="w")
+        ui.label(page, subtitle, 10, ui.MUTED).pack(anchor="w", pady=(2, 16))
+        return page
+
+    def show_page(self, name, animate=True):
+        if name == self.page:
+            return
+        old, self.page = self.page, name
+        for n, (row, accent, *labels) in self._nav.items():
+            on = n == name
+            row.config(bg=ui.CARD if on else ui.SIDEBAR)
+            accent.config(bg=ui.ACCENT if on else ui.SIDEBAR)
+            for w in labels:
+                w.config(bg=ui.CARD if on else ui.SIDEBAR, fg=ui.TEXT if on else ui.MUTED)
+        if old:
+            self.pages[old].place_forget()
+        page = self.pages[name]
+        w = self.WIDTH - self.SIDEBAR_W
+        if not animate:
+            page.place(x=0, y=0, width=w, relheight=1)
+            return
+        ui.animate(page, 220, lambda t: page.place(x=0, y=round(18 * (1 - t)), width=w, relheight=1))
+
+    def _page_general(self):
+        page = self._page("General", "Connect Screen Intel to Google Gemini.")
+        box = ui.card(page)
+        box.pack(fill="x")
+        c = box.inner
+        ui.label(c, "Gemini API key", 11, weight="bold").pack(anchor="w")
+        ui.label(c, "Saved only on this computer.", 9, ui.MUTED).pack(anchor="w", pady=(0, 8))
+        row = tk.Frame(c, bg=ui.CARD)
+        row.pack(fill="x")
+        self.key_entry = ui.entry(row, self.key, show="•", width=38)
+        self.key_entry.pack(side="left", fill="x", expand=True, ipady=6)
+        self._show_btn = ui.Button(row, "Show", self._toggle_key, "secondary", width=70, height=34)
+        self._show_btn.pack(side="left", padx=(8, 0))
+        ui.link(c, "Get a free key  ↗", KEY_URL).pack(anchor="w", pady=(8, 0))
+
+        box = ui.card(page)
+        box.pack(fill="x", pady=(14, 0))
+        c = box.inner
+        ui.label(c, "Model", 11, weight="bold").pack(anchor="w")
+        ui.label(c, f"Leave the default ({DEFAULT_MODEL}) unless it stops working.", 9, ui.MUTED).pack(
+            anchor="w", pady=(0, 8)
+        )
+        ui.entry(c, self.model, width=38).pack(fill="x", ipady=6)
+        return page
+
+    def _page_appearance(self):
+        page = self._page("Appearance", "How the answer looks on your screen.")
+        # Live preview: the answer drawn over a fake quiz page.
+        self.preview = tk.Canvas(page, height=104, bg="#2b2f3a", highlightthickness=1,
+                                 highlightbackground=ui.BORDER)
+        self.preview.pack(fill="x")
+        self.preview.bind("<Configure>", lambda e: self._draw_preview())
+
+        row = tk.Frame(page, bg=ui.BG)
+        row.pack(fill="x", pady=(16, 6))
+        ui.label(row, "Font", 11, weight="bold").pack(side="left")
+        size = tk.Frame(row, bg=ui.BG)
+        size.pack(side="right")
+        ui.label(size, "Size", 11, weight="bold").pack(side="left", padx=(0, 10))
+        ui.Button(size, "−", lambda: self._set_size(self.font_size - 1), "secondary", 34, 30, size=12).pack(
+            side="left"
+        )
+        self._size_label = ui.label(size, "", 11, width=6, anchor="center")
+        self._size_label.pack(side="left")
+        ui.Button(size, "+", lambda: self._set_size(self.font_size + 1), "secondary", 34, 30, size=12).pack(
+            side="left"
+        )
+
+        fonts = tk.Frame(page, bg=ui.BG)
+        fonts.pack(fill="x")
+        self._font_chips = {}
+        for i, (name, fam) in enumerate(self._fonts):
+            chip = tk.Label(fonts, text=name, font=(fam or ui.family(page), 11), bg=ui.CARD, fg=ui.TEXT,
+                            padx=8, pady=6, cursor="hand2", highlightthickness=1)
+            chip.grid(row=i // 3, column=i % 3, sticky="we", padx=(0, 6), pady=(0, 6))
+            chip.bind("<Button-1>", lambda e, f=fam: self._set_font(f))
+            self._font_chips[fam] = chip
+        for col in range(3):
+            fonts.columnconfigure(col, weight=1, uniform="font")
+
+        ui.label(page, "Color", 11, weight="bold").pack(anchor="w", pady=(10, 6))
+        colors = tk.Frame(page, bg=ui.BG)
+        colors.pack(fill="x")
+        self._swatches = {}
+        for color in COLORS:
+            sw = tk.Canvas(colors, width=30, height=30, bg=ui.BG, highlightthickness=0, cursor="hand2")
+            sw.pack(side="left", padx=(0, 6))
+            sw.bind("<Button-1>", lambda e, c=color: self._set_color(c))
+            self._swatches[color] = sw
+        tools = tk.Frame(page, bg=ui.BG)
+        tools.pack(fill="x", pady=(10, 0))
+        ui.Button(tools, "⊹  Pick a color from the screen", self._pick_color, "secondary", height=32).pack(
+            side="left"
+        )
+        ui.Button(tools, "Custom…", self._custom_color, "ghost", height=32).pack(side="left", padx=6)
+        self._hex = ui.label(tools, "", 10, ui.MUTED)
+        self._hex.pack(side="right")
+        self._refresh_appearance()
+        return page
+
+    def _page_shortcuts(self):
+        page = self._page("Shortcuts", "Click a shortcut, then press the keys you want. Esc cancels.")
+        box = ui.card(page, padding=14)
+        box.pack(fill="x")
+        for action, (_, label) in ACTIONS.items():
+            row = tk.Frame(box.inner, bg=ui.CARD)
+            row.pack(fill="x", pady=2)
+            ui.label(row, label, 10).pack(side="left")
+            field = ShortcutField(row, self._current["shortcuts"][action], self._check_shortcuts)
+            field.widget.pack(side="right")
+            self.shortcuts[action] = field
+        ui.Button(page, "Reset to defaults", self._reset_shortcuts, "ghost").pack(anchor="w", pady=(10, 0))
+        return page
+
+    def _page_background(self):
+        page = self._page("Background", "Screen Intel runs quietly until you press a shortcut.")
+        box = ui.card(page)
+        box.pack(fill="x")
+        c = box.inner
+        where = (
+            "Click the lens icon in the menu bar (top right) for Show / hide, Settings and Quit. "
+            "Clicking the Dock icon opens Settings."
+            if IS_MAC
+            else "Right-click the lens icon in the system tray (bottom right, maybe behind ^) for "
+            "Show / hide, Settings and Quit. Click it to show or hide the answer."
+        )
+        ui.label(c, "Where to find it", 11, weight="bold").pack(anchor="w")
+        ui.label(c, where, 10, ui.MUTED, wraplength=470).pack(anchor="w", pady=(4, 12))
+        buttons = tk.Frame(c, bg=ui.CARD)
+        buttons.pack(anchor="w")
+        ui.Button(buttons, "Show welcome tour", lambda: self._run("welcome"), "secondary").pack(side="left")
+        ui.Button(buttons, "Restart", lambda: self._run("restart"), "secondary").pack(side="left", padx=8)
+        ui.Button(buttons, "Quit Screen Intel", lambda: self._run("quit"), "danger").pack(side="left")
+
+        box = ui.card(page)
+        box.pack(fill="x", pady=(14, 0))
+        c = box.inner
+        ui.label(c, "Leaves nothing behind", 11, weight="bold").pack(anchor="w")
+        text = (
+            "No services, startup entries or background helpers. When you turn it off it is gone. "
+            f"The only file it keeps is your settings:\n{user_config_file()}"
+        )
+        ui.label(c, text, 10, ui.MUTED, wraplength=470).pack(anchor="w", pady=(4, 0))
+        return page
+
+    # Appearance
+
+    def _set_size(self, size):
+        self.font_size = max(MIN_FONT, min(MAX_FONT, size))
+        self._refresh_appearance()
+
+    def _set_font(self, family):
+        self.font_family = family
+        self._refresh_appearance()
+
+    def _set_color(self, color):
+        if color:
+            self.color = color.lower()
+            self._refresh_appearance()
+
+    def _custom_color(self):
+        from tkinter import colorchooser
+
+        _, color = colorchooser.askcolor(self.color, parent=self.win, title="Answer color")
+        self._set_color(color)
+
+    def _pick_color(self):
+        """Hide Settings, let the user click a color anywhere on the screen, then come back."""
+        self.win.withdraw()
+
+        def done(color):
+            self.focus()
+            self.show_page("appearance", animate=False)
+            self._set_color(color)
+
+        self.win.after(250, lambda: ui.pick_screen_color(self.win, done))
+
+    def _refresh_appearance(self):
+        self._size_label.config(text=f"{self.font_size}")
+        self._hex.config(text=self.color.upper())
+        for fam, chip in self._font_chips.items():
+            on = fam == self.font_family
+            chip.config(bg=ui.mix(ui.CARD, ui.ACCENT, 0.25) if on else ui.CARD,
+                        highlightbackground=ui.ACCENT if on else ui.BORDER)
+        for color, sw in self._swatches.items():
+            sw.delete("all")
+            if color == self.color:
+                sw.create_oval(1, 1, 29, 29, outline=ui.ACCENT_HOVER, width=2)
+            sw.create_oval(6, 6, 24, 24, fill=color, outline=ui.BORDER)
+        self._draw_preview()
+
+    def _draw_preview(self):
+        c = self.preview
+        c.delete("all")
+        w = c.winfo_width() if c.winfo_width() > 1 else 500
+        for i in range(3):  # a faint quiz page behind the answer
+            c.create_rectangle(18, 18 + i * 26, w * (0.55 - i * 0.1), 30 + i * 26, fill="#363b48", outline="")
+        pixels = max(1, round(self.font_size * c.winfo_fpixels("1p")))  # same sizing as the overlay
+        font = (self.font_family or self._system_family, -pixels)
+        c.create_text(w - 24, 52, text="B   ·   Paris | 1789", font=font, fill=self.color, anchor="e")
+
+    # Window
 
     def focus(self):
         self.win.update_idletasks()
-        x = (self.win.winfo_screenwidth() - self.win.winfo_reqwidth()) // 2
-        y = (self.win.winfo_screenheight() - self.win.winfo_reqheight()) // 3
+        x = (self.win.winfo_screenwidth() - self.WIDTH) // 2
+        y = (self.win.winfo_screenheight() - self.HEIGHT) // 3
         self.win.geometry(f"+{x}+{y}")  # centered, away from the overlay in the top-left
-        self.win.deiconify()
-        self.win.lift()
-        self.win.focus_force()
-        self.key_entry.focus_set()
+        ui.bring_to_front(self.win)
 
     def is_open(self):
         return bool(self.win.winfo_exists())
@@ -222,6 +482,10 @@ class SettingsWindow:
     def close(self):
         self.win.destroy()
         self._on_close()
+
+    def _run(self, action):
+        self.close()
+        self._actions[action]()
 
     def _reset_shortcuts(self):
         for action, (default, _) in ACTIONS.items():
@@ -238,51 +502,63 @@ class SettingsWindow:
         return problem
 
     def _toggle_key(self):
-        self.key_entry.config(show="" if self.show_key.get() else "•")
+        hidden = self.key_entry.cget("show") != ""
+        self.key_entry.config(show="" if hidden else "•")
+        self._show_btn.set_text("Hide" if hidden else "Show")
 
     def _save(self):
         key = self.key.get().strip()
         if not key:
+            self.show_page("general")
             self.error.config(text="Please paste your Gemini API key.")
             return
-        try:
-            size = int(self.font_size.get())
-        except (tk.TclError, ValueError):
-            self.error.config(text=f"Text size must be a number from {MIN_FONT} to {MAX_FONT}.")
-            return
         if self._check_shortcuts():
+            self.show_page("shortcuts")
             return
-        shortcuts = self._current_shortcuts()
-        self._on_save({
-            "api_key": key,
-            "model": self.model.get().strip() or DEFAULT_MODEL,
-            "font_size": max(MIN_FONT, min(MAX_FONT, size)),
-            "shortcuts": shortcuts,
-        })
+        self._on_save(dict(
+            self._current,
+            api_key=key,
+            model=self.model.get().strip() or DEFAULT_MODEL,
+            font_size=self.font_size,
+            font_family=self.font_family,
+            text_color=self.color,
+            shortcuts=self._current_shortcuts(),
+        ))
         self.close()
 
 
 class ShortcutField:
-    """A box that records a shortcut when you press it: click, then press e.g. Ctrl+Shift+Q."""
+    """A key-shaped box that records a shortcut when you press it: click, then press e.g. Ctrl+Shift+Q."""
 
     def __init__(self, parent, combo, on_change):
         self.combo = combo
         self._on_change = on_change
         self._held = set()  # modifiers whose key is down (catches Win/Cmd that event.state may miss)
-        self._var = tk.StringVar(value=shortcut_label(combo))
-        self.entry = ttk.Entry(parent, textvariable=self._var, width=18, justify="center")
-        self.entry.bind("<FocusIn>", lambda e: self._var.set("Press keys..."))
-        self.entry.bind("<FocusOut>", lambda e: self._show())
-        self.entry.bind("<KeyPress>", self._key_down)
-        self.entry.bind("<KeyRelease>", self._key_up)
+        self.widget = tk.Label(
+            parent, width=16, bg=ui.INPUT, fg=ui.TEXT, font=ui.font(parent, 10, "bold"), pady=5,
+            cursor="hand2", takefocus=True, highlightthickness=1, highlightbackground=ui.BORDER,
+            highlightcolor=ui.ACCENT,
+        )
+        self.widget.bind("<Button-1>", lambda e: self.widget.focus_set())
+        self.widget.bind("<FocusIn>", lambda e: self._recording("Press keys…"))
+        self.widget.bind("<FocusOut>", lambda e: self._show())
+        self.widget.bind("<KeyPress>", self._key_down)
+        self.widget.bind("<KeyRelease>", self._key_up)
+        self._show()
 
     def set(self, combo):
         self.combo = combo
         self._show()
 
+    def _recording(self, text):
+        self.widget.config(text=text, fg=ui.ACCENT_HOVER)
+
     def _show(self):
         self._held.clear()
-        self._var.set(shortcut_label(self.combo))
+        self.widget.config(text=shortcut_label(self.combo), fg=ui.TEXT)
+
+    def _done(self):
+        self.widget.winfo_toplevel().focus_set()
 
     def _key_down(self, event):
         mod = hotkeys.modifier_from_keysym(event.keysym)
@@ -290,17 +566,17 @@ class ShortcutField:
             self._held.add(mod)
         mods = self._held | hotkeys.mods_from_state(event.state)
         if event.keysym == "Escape" and not mods:
-            self.entry.master.focus_set()  # cancel: keep the old shortcut
+            self._done()  # cancel: keep the old shortcut
             return "break"
         key = None if mod else hotkeys.key_from_event(event.keysym, event.keycode)
         if key is None:
             # Only modifiers so far (or an unusable key): show what is held.
             held = hotkeys.canonical(mods, "").rstrip("+")
-            self._var.set(shortcut_label(held) + "+..." if held else "Press keys...")
+            self._recording(shortcut_label(held + "+…") if held else "Press keys…")
             return "break"
         self.combo = hotkeys.canonical(mods, key)
         self._show()
-        self.entry.master.focus_set()  # done recording
+        self._done()  # done recording
         self._on_change()
         return "break"
 

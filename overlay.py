@@ -8,9 +8,15 @@ IS_MAC = sys.platform == "darwin"
 
 # Windows: pixels of KEY_COLOR become fully transparent and click-through. macOS: native transparency.
 KEY_COLOR = "systemTransparent" if IS_MAC else "#010101"
-TEXT_COLOR = "white"
+DEFAULT_COLOR = "#ffffff"
 # Windows 11 taskbar clock font, falling back to the Windows 10 one.
 WINDOWS_FONTS = ("Segoe UI Variable Text", "Segoe UI")
+# Answer fonts offered in Settings besides the system font (only installed ones are shown).
+FONT_CHOICES = (
+    ("Helvetica Neue", "Avenir Next", "Futura", "Georgia", "Menlo", "Courier New")
+    if IS_MAC
+    else ("Arial", "Calibri", "Verdana", "Georgia", "Consolas", "Cascadia Mono", "Comic Sans MS")
+)
 MIN_FONT, MAX_FONT = 4, 72
 PAD = 4
 
@@ -27,14 +33,27 @@ def system_font_family(root):
     return next((f for f in WINDOWS_FONTS if f in installed), "TkDefaultFont")
 
 
+def available_fonts(root):
+    """[(name shown in Settings, family to store)], system font first; "" means the system font."""
+    installed = set(tkfont.families(root))
+    return [("System", "")] + [(f, f) for f in FONT_CHOICES if f in installed]
+
+
+def safe_color(color):
+    """Windows draws KEY_COLOR as see-through, so a picked #010101 would make the text vanish."""
+    return "#020202" if color.lower() == KEY_COLOR else color
+
+
 class Overlay:
-    def __init__(self, root, font_size=14, position=(40, 40)):
+    def __init__(self, root, font_size=14, font_family="", color=DEFAULT_COLOR, position=(40, 40)):
         self.root = root
         self.font_size = font_size
         self.visible = True
         self._text = ""
         self._drag_from = None
-        self._font_family = system_font_family(root)
+        self._system_family = system_font_family(root)
+        self._font_family = font_family or self._system_family
+        self._color = safe_color(color)
 
         root.overrideredirect(True)
         root.attributes("-topmost", True)
@@ -92,6 +111,12 @@ class Overlay:
         self.font_size = max(MIN_FONT, min(MAX_FONT, size))
         self._redraw()
 
+    def set_style(self, font_family, color):
+        """font_family "" means the system font."""
+        self._font_family = font_family or self._system_family
+        self._color = safe_color(color)
+        self._redraw()
+
     def _redraw(self):
         c = self.canvas
         c.delete("all")
@@ -103,7 +128,7 @@ class Overlay:
         pixels = max(1, round(self.font_size * self.root.winfo_fpixels("1p")))
         font = (self._font_family, -pixels)
         wrap = self.font_size * 30
-        c.create_text(PAD, PAD, text=self._text, font=font, fill=TEXT_COLOR, anchor="nw", width=wrap)
+        c.create_text(PAD, PAD, text=self._text, font=font, fill=self._color, anchor="nw", width=wrap)
 
         _, _, x2, y2 = c.bbox("all")
         c.config(width=x2 + PAD, height=y2 + PAD)
