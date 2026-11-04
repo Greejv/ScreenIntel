@@ -83,7 +83,7 @@ def test_settings_roundtrip(tmp_path, monkeypatch):
     defaults = {action: default for action, (default, _) in settings.ACTIONS.items()}
     fresh = {
         "api_key": None, "model": settings.DEFAULT_MODEL, "font_size": 14, "font_family": "",
-        "text_color": "#ffffff", "shortcuts": defaults, "onboarded": False,
+        "text_color": "#ffffff", "text_outline": True, "shortcuts": defaults, "onboarded": False,
     }
     assert settings.load() == fresh
 
@@ -94,7 +94,7 @@ def test_settings_roundtrip(tmp_path, monkeypatch):
 
     custom = dict(defaults, capture="alt+f2")
     saved = dict(fresh, api_key="abc", model="m", font_size=9, font_family="Georgia", text_color="#ffd60a",
-                 shortcuts=custom, onboarded=True)
+                 text_outline=False, shortcuts=custom, onboarded=True)
     settings.save(saved)
     assert settings.load() == saved
 
@@ -229,3 +229,13 @@ def test_key_lives_in_credential_store_and_uninstall_removes_everything(tmp_path
     assert fake.store == {}
     assert len(removed) >= 2
     assert settings.load()["api_key"] is None
+
+
+def test_outline_off_uses_a_background_next_to_the_text_color(monkeypatch):
+    import overlay
+
+    monkeypatch.setattr(overlay, "IS_MAC", False)
+    assert overlay.key_color("#ffffff", outline=True) == overlay.KEY_COLOR
+    assert overlay.key_color("#ffffff", outline=False) == "#fefefe"
+    assert overlay.key_color("#000000", outline=False) == "#010101"
+    assert overlay.key_color("#ffd60a", outline=False) not in ("#ffd60a", overlay.KEY_COLOR)

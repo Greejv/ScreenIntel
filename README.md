@@ -177,7 +177,7 @@ Open Settings from the **tray icon** (Windows) or the **menu bar icon** / Dock i
 | Page | What you can change |
 |:--|:--|
 | **General** | Your **Gemini API key** (click **Show** to check it, or **Get a free key**) and the **Model**. Leave the model on the default unless it stops working. |
-| **Appearance** | The answer's **font** (system font or a few others), **size** (4 to 72) and **color**: pick a swatch, choose **Custom…**, or click **Pick a color from the screen** and then click any pixel on your screen (a magnifier shows exactly which one). A live preview shows the result. |
+| **Appearance** | The answer's **font** (system font or a few others), **size** (4 to 72) and **color**: pick a swatch, choose **Custom…**, or click **Pick a color from the screen** and then click any pixel on your screen (a magnifier shows exactly which one). On Windows, turn **Dark outline** off to drop the thin dark edge around the text (it helps light text on white pages, so it's on by default). A live preview shows the result, and the page scrolls. |
 | **Background** | Where to find the running app, **Show welcome tour**, **Restart** and **Quit**. |
 | **Shortcuts** | Click the box next to an action and **press the keys** you want, e.g. `Ctrl` + `Alt` + `T`. Use at least one of Ctrl, Shift, Alt/Option or Win/Cmd plus a letter, number, arrow, `=`, `-`, space or F1–F12. `Esc` cancels. Screen Intel refuses system shortcuts (like `Ctrl` + `C`, `Win` + `D` or `Cmd` + `Space`), shortcuts used twice, and on Windows any shortcut another app already owns. **Reset to defaults** restores the defaults. Your shortcuts are paused while Settings is open. |
 
@@ -271,6 +271,7 @@ GEMINI_MODEL=gemini-3.5-flash-lite   # optional, this is the default
 FONT_SIZE=14                         # optional, 4 to 72
 FONT_FAMILY=Georgia                  # optional, empty = system font
 TEXT_COLOR=#ffffff                   # optional, answer color
+TEXT_OUTLINE=1                       # optional, 0 = no dark edge around the text (Windows)
 ONBOARDED=1                          # set after the welcome tour; remove it to see the tour again
 ```
 </details>

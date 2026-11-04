@@ -44,8 +44,20 @@ def safe_color(color):
     return "#020202" if color.lower() == KEY_COLOR else color
 
 
+def key_color(color, outline):
+    """The see-through background color. Windows blends the edges of smooth text into the background, so a
+    near-black background gives the text a thin dark outline (easier to read on light pages). Without the
+    outline the background is the text color off by one, so the edges blend into the text color instead.
+    """
+    if IS_MAC or outline:
+        return KEY_COLOR
+    rgb = [int(color[i:i + 2], 16) for i in (1, 3, 5)]
+    return "#" + "".join(f"{c - 1 if c else 1:02x}" for c in rgb)
+
+
 class Overlay:
-    def __init__(self, root, font_size=14, font_family="", color=DEFAULT_COLOR, position=(40, 40)):
+    def __init__(self, root, font_size=14, font_family="", color=DEFAULT_COLOR, outline=True,
+                 position=(40, 40)):
         self.root = root
         self.font_size = font_size
         self.visible = True
@@ -59,13 +71,11 @@ class Overlay:
         root.attributes("-topmost", True)
         if IS_MAC:
             root.attributes("-transparent", True)
-        else:
-            root.attributes("-transparentcolor", KEY_COLOR)
-        root.config(bg=KEY_COLOR)
         root.geometry(f"+{position[0]}+{position[1]}")
 
-        self.canvas = tk.Canvas(root, bg=KEY_COLOR, highlightthickness=0, bd=0)
+        self.canvas = tk.Canvas(root, highlightthickness=0, bd=0)
         self.canvas.pack()
+        self._set_key(key_color(self._color, outline))
         self.canvas.bind("<ButtonPress-1>", self._start_drag)
         self.canvas.bind("<B1-Motion>", self._drag)
 
@@ -111,10 +121,17 @@ class Overlay:
         self.font_size = max(MIN_FONT, min(MAX_FONT, size))
         self._redraw()
 
-    def set_style(self, font_family, color):
-        """font_family "" means the system font."""
+    def _set_key(self, key):
+        if not IS_MAC:
+            self.root.attributes("-transparentcolor", key)
+        self.root.config(bg=key)
+        self.canvas.config(bg=key)
+
+    def set_style(self, font_family, color, outline=True):
+        """font_family "" means the system font. outline: dark edge around the text (Windows only)."""
         self._font_family = font_family or self._system_family
         self._color = safe_color(color)
+        self._set_key(key_color(self._color, outline))
         self._redraw()
 
     def _redraw(self):
