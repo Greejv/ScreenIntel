@@ -233,7 +233,13 @@ class MacHotkeys:
         self._bindings = dict(bindings)
         self._held = set()  # modifiers that are down
         self._fired = set()  # keys whose shortcut fired and that are still down
-        self._listener = keyboard.Listener(on_press=self._press, on_release=self._release)
+        class Listener(keyboard.Listener):
+            def _run(self):
+                # pynput's own _run first reads the keyboard layout (TSMGetInputSourceProperty) on this
+                # background thread, which macOS 14+ kills the app for. The result is unused, so skip it.
+                super(keyboard.Listener, self)._run()
+
+        self._listener = Listener(on_press=self._press, on_release=self._release)
         self.ready = threading.Event()
         self.failed = []
 
