@@ -37,11 +37,12 @@ If you changed anything visual or platform-specific, also run the app and check 
 - [ ] Settings opens (tray on Windows, menu bar icon / Dock icon / Cmd+, on macOS), and Save applies the key, font, color and text size right away
 - [ ] Appearance → Pick a color from the screen hides Settings, shows the magnifier, and the clicked color is used
 - [ ] In Settings, clicking a shortcut box and pressing e.g. Ctrl+Alt+T records it; Ctrl+C is refused as a system shortcut; the new shortcut works after Save
+- [ ] Settings → Background → Uninstall removes the key (Credential Manager / Keychain) and the settings folder, then shows the app file
 - [ ] Quit works: `Ctrl+Shift+X` (`⌃⌥X` on macOS), tray / menu bar icon, Cmd+Q on macOS
 
 ## Code guidelines
 
-- **Small and plain.** The whole app is a few hundred lines; keep it that way. Standard library + the four dependencies in `requirements.txt`. Ask before adding a dependency.
+- **Small and plain.** The whole app is a few hundred lines; keep it that way. Standard library + the dependencies in `requirements.txt`. Ask before adding a dependency.
 - **One job per module.** `ai.py` (Gemini), `hotkeys.py` (shortcuts), `overlay.py` (answer window), `settings.py` (settings file and Settings window), `welcome.py` (first-launch tour), `ui.py` (shared look, animations, screen color picker), `main.py` (wiring). Don't let GUI code into `ai.py` or Gemini code into the GUI modules.
 - **Threads talk through the queue.** Only the tk main thread touches tkinter; other threads put `(name, value)` on `App.events`.
 - **Platform branches** go inside the module that needs them (`if IS_MAC:`), with platform-only imports inside the branch.
