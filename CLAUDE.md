@@ -47,3 +47,4 @@ Bump `VERSION` (semver, no `v`) and push to `main`. CI builds both platforms and
 - The tray (Windows) and menu bar icon (macOS) share `main.MENU`. The macOS one is created with AppKit inside a try: if it fails, the Dock icon and app menu still open Settings.
 - Shortcut strings are always canonical (`hotkeys.canonical`: ctrl, shift, alt, win, then key) so comparisons and the `SYSTEM_SHORTCUTS` lookup work.
 - The one-file Windows exe takes several seconds to start. That's PyInstaller unpacking, not a bug.
+- macOS 14+ kills the app when the keyboard layout (TSM/TIS APIs) is read off the main thread. pynput's `Listener._run` does that, so `MacHotkeys` overrides it to skip the unused lookup. pynput is pinned below 1.9; recheck that override before upgrading.

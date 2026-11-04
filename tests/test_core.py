@@ -186,6 +186,29 @@ def test_mac_listener_matches_by_key_and_fires_once():
     assert hits == [1, 1]
 
 
+def test_mac_listener_skips_keyboard_layout_lookup(monkeypatch):
+    """pynput's Listener._run reads the keyboard layout off the main thread, which crashes macOS 14+."""
+    import types
+
+    class Mixin:  # stands in for pynput's ListenerMixin, whose _run listens for events
+        def _run(self):
+            self.listened = True
+
+    class Listener(Mixin):  # stands in for pynput.keyboard.Listener on macOS
+        def __init__(self, on_press, on_release):
+            pass
+
+        def _run(self):
+            raise AssertionError("read the keyboard layout on a background thread")
+
+    pynput = types.ModuleType("pynput")
+    pynput.keyboard = types.SimpleNamespace(Listener=Listener)
+    monkeypatch.setitem(sys.modules, "pynput", pynput)
+    listener = hotkeys.MacHotkeys({})._listener
+    listener._run()
+    assert listener.listened
+
+
 class FakeKeyring:
     def __init__(self):
         self.store = {}
