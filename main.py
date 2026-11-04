@@ -115,7 +115,8 @@ class App:
         self.root = tk.Tk()
         self.root.report_callback_exception = self._on_tk_error
         s = self.settings
-        self.overlay = overlay.Overlay(self.root, s["font_size"], s["font_family"], s["text_color"])
+        self.overlay = overlay.Overlay(self.root, s["font_size"], s["font_family"], s["text_color"],
+                                       s["text_outline"])
 
         self.hotkeys = None
         self._start_hotkeys()
@@ -251,7 +252,7 @@ class App:
         self.settings = new  # shortcuts are re-registered when the window closes
         self.answerer = self._make_answerer()
         self.overlay.set_font_size(new["font_size"])
-        self.overlay.set_style(new["font_family"], new["text_color"])
+        self.overlay.set_style(new["font_family"], new["text_color"], new["text_outline"])
         if self.tray and not IS_MAC:
             capture = settings.shortcut_label(new["shortcuts"]["capture"])
             self.tray.title = f"Screen Intel · {capture} to answer"

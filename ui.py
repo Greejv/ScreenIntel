@@ -344,3 +344,77 @@ def notice(root, title, heading, body, buttons, on_close):
     bring_to_front(win)
     fade_in(win)
     return win
+
+
+def scrollable(parent, bg):
+    """A vertically scrolling area: returns (outer frame to place, inner frame to fill). Scrolls with the
+    mouse wheel or touchpad anywhere in the window while it is visible, and with a thin draggable bar."""
+    outer = tk.Frame(parent, bg=bg)
+    canvas = tk.Canvas(outer, bg=bg, highlightthickness=0, bd=0, yscrollincrement=12)
+    bar = tk.Canvas(outer, width=8, bg=bg, highlightthickness=0, bd=0)
+    inner = tk.Frame(canvas, bg=bg)
+    item = canvas.create_window(0, 0, window=inner, anchor="nw")
+    bar.pack(side="right", fill="y", padx=(0, 6), pady=8)
+    canvas.pack(side="left", fill="both", expand=True)
+
+    def draw_bar(*_):
+        bar.delete("all")
+        first, last = canvas.yview()
+        if last - first < 0.999:  # only when there is something to scroll
+            h = bar.winfo_height()
+            rounded_rect(bar, 1, first * h, 7, last * h, 3, fill=BORDER, outline="")
+
+    def resize(_=None):
+        canvas.itemconfigure(item, width=canvas.winfo_width())
+        canvas.config(scrollregion=(0, 0, canvas.winfo_width(), inner.winfo_reqheight()))
+        draw_bar()
+
+    def wheel(event):
+        if not canvas.winfo_ismapped() or canvas.yview() == (0.0, 1.0):
+            return
+        if event.num in (4, 5):  # Linux
+            step = -3 if event.num == 4 else 3
+        elif sys.platform == "win32":
+            step = -round(event.delta / 40)  # 120 per notch
+        else:
+            step = -event.delta  # macOS: small values, touchpads send many
+        canvas.yview_scroll(step, "units")
+
+    def drag(event):
+        first, last = canvas.yview()
+        canvas.yview_moveto(event.y / max(1, bar.winfo_height()) - (last - first) / 2)
+
+    canvas.config(yscrollcommand=draw_bar)
+    inner.bind("<Configure>", resize)
+    canvas.bind("<Configure>", resize)
+    bar.bind("<Button-1>", drag)
+    bar.bind("<B1-Motion>", drag)
+    top = parent.winfo_toplevel()
+    for sequence in ("<MouseWheel>", "<Button-4>", "<Button-5>"):
+        top.bind(sequence, wheel, add="+")
+    return outer, inner
+
+
+class Switch(tk.Canvas):
+    """An on/off switch. Calls command(value) when flipped; the knob slides."""
+
+    def __init__(self, parent, value, command):
+        super().__init__(parent, width=42, height=24, bg=parent.cget("bg"), highlightthickness=0, bd=0,
+                         cursor="hand2")
+        self.value, self._command = value, command
+        self._draw(1.0 if value else 0.0)
+        self.bind("<ButtonRelease-1>", lambda e: self.set(not self.value, notify=True))
+
+    def set(self, value, notify=False):
+        if value == self.value:
+            return
+        self.value = value
+        animate(self, 160, lambda t: self._draw(t if value else 1 - t))
+        if notify:
+            self._command(value)
+
+    def _draw(self, t):
+        self.delete("all")
+        rounded_rect(self, 1, 1, 41, 23, 11, fill=mix(BORDER, ACCENT, t), outline="")
+        x = 12 + 18 * t
+        self.create_oval(x - 8, 4, x + 8, 20, fill="white", outline="")

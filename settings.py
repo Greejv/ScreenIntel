@@ -55,7 +55,8 @@ MAC_DEFAULTS = {
 _DEFAULTS = MAC_DEFAULTS if IS_MAC else WINDOWS_DEFAULTS
 ACTIONS = {action: (_DEFAULTS[action], label) for action, label in ACTION_LABELS.items()}
 _ENV_NAMES = (
-    "GEMINI_API_KEY", "GOOGLE_API_KEY", "GEMINI_MODEL", "FONT_SIZE", "FONT_FAMILY", "TEXT_COLOR", "ONBOARDED"
+    "GEMINI_API_KEY", "GOOGLE_API_KEY", "GEMINI_MODEL", "FONT_SIZE", "FONT_FAMILY", "TEXT_COLOR",
+    "TEXT_OUTLINE", "ONBOARDED",
 ) + tuple(f"SHORTCUT_{a.upper()}" for a in ACTIONS)
 _MOD_ALIASES = {"control": "ctrl", "option": "alt", "cmd": "win", "command": "win"}
 _MAC_SYMBOLS = {"ctrl": "⌃", "alt": "⌥", "shift": "⇧", "win": "⌘", "up": "↑", "down": "↓", "left": "←",
@@ -259,6 +260,7 @@ def load():
         "font_size": max(MIN_FONT, min(MAX_FONT, font_size)),
         "font_family": values.get("FONT_FAMILY", ""),
         "text_color": color if re.fullmatch(r"#[0-9a-f]{6}", color) else DEFAULT_COLOR,
+        "text_outline": values.get("TEXT_OUTLINE", "1") != "0",
         "shortcuts": shortcuts,
         "onboarded": values.get("ONBOARDED") == "1",
     }
@@ -276,6 +278,7 @@ def save(settings):
     set_key(str(path), "FONT_SIZE", str(settings["font_size"]))
     set_key(str(path), "FONT_FAMILY", settings["font_family"])
     set_key(str(path), "TEXT_COLOR", settings["text_color"])
+    set_key(str(path), "TEXT_OUTLINE", "1" if settings["text_outline"] else "0")
     set_key(str(path), "ONBOARDED", "1" if settings["onboarded"] else "")
     for action, combo in settings["shortcuts"].items():
         set_key(str(path), f"SHORTCUT_{action.upper()}", combo)
@@ -312,6 +315,7 @@ class SettingsWindow:
         self.font_size = current["font_size"]
         self.font_family = current["font_family"]
         self.color = current["text_color"]
+        self.outline = current["text_outline"]
         self.shortcuts = {}
 
         self._build_sidebar()
@@ -378,8 +382,13 @@ class SettingsWindow:
         self.error = ui.label(foot, "", 9, ui.DANGER, wraplength=320)
         self.error.pack(side="left", padx=28)
 
-    def _page(self, title, subtitle):
-        page = tk.Frame(self.content, bg=ui.BG, padx=28, pady=24)
+    def _page(self, title, subtitle, scroll=False):
+        if scroll:
+            outer, page = ui.scrollable(self.content, ui.BG)
+            page.config(padx=28, pady=24)
+            page.outer = outer  # what show_page places
+        else:
+            page = tk.Frame(self.content, bg=ui.BG, padx=28, pady=24)
         ui.label(page, title, 18, weight="bold").pack(anchor="w")
         ui.label(page, subtitle, 10, ui.MUTED).pack(anchor="w", pady=(2, 16))
         return page
@@ -395,8 +404,8 @@ class SettingsWindow:
             for w in labels:
                 w.config(bg=ui.CARD if on else ui.SIDEBAR, fg=ui.TEXT if on else ui.MUTED)
         if old:
-            self.pages[old].place_forget()
-        page = self.pages[name]
+            getattr(self.pages[old], "outer", self.pages[old]).place_forget()
+        page = getattr(self.pages[name], "outer", self.pages[name])  # a scrolling page is placed by its frame
         w = self.WIDTH - self.SIDEBAR_W
         if not animate:
             page.place(x=0, y=0, width=w, relheight=1)
@@ -429,7 +438,7 @@ class SettingsWindow:
         return page
 
     def _page_appearance(self):
-        page = self._page("Appearance", "How the answer looks on your screen.")
+        page = self._page("Appearance", "How the answer looks on your screen.", scroll=True)
         # Live preview: the answer drawn over a fake quiz page.
         self.preview = tk.Canvas(page, height=104, bg="#2b2f3a", highlightthickness=1,
                                  highlightbackground=ui.BORDER)
@@ -480,6 +489,14 @@ class SettingsWindow:
         ui.Button(tools, "Custom…", self._custom_color, "ghost", height=32).pack(side="left", padx=6)
         self._hex = ui.label(tools, "", 10, ui.MUTED)
         self._hex.pack(side="right")
+
+        if not IS_MAC:  # macOS draws transparent text without the dark edge
+            row = tk.Frame(page, bg=ui.BG)
+            row.pack(fill="x", pady=(18, 0))
+            ui.Switch(row, self.outline, self._set_outline).pack(side="right")
+            ui.label(row, "Dark outline", 11, weight="bold").pack(anchor="w")
+            hint = "A thin dark edge that makes light text readable on white pages."
+            ui.label(row, hint, 9, ui.MUTED).pack(anchor="w")
         self._refresh_appearance()
         return page
 
@@ -576,6 +593,10 @@ class SettingsWindow:
 
         self.win.after(250, lambda: ui.pick_screen_color(self.win, done))
 
+    def _set_outline(self, on):
+        self.outline = on
+        self._draw_preview()
+
     def _refresh_appearance(self):
         self._size_label.config(text=f"{self.font_size}")
         self._hex.config(text=self.color.upper())
@@ -598,7 +619,11 @@ class SettingsWindow:
             c.create_rectangle(18, 18 + i * 26, w * (0.55 - i * 0.1), 30 + i * 26, fill="#363b48", outline="")
         pixels = max(1, round(self.font_size * c.winfo_fpixels("1p")))  # same sizing as the overlay
         font = (self.font_family or self._system_family, -pixels)
-        c.create_text(w - 24, 52, text="B   ·   Paris | 1789", font=font, fill=self.color, anchor="e")
+        text = "B   ·   Paris | 1789"
+        if self.outline and not IS_MAC:
+            for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                c.create_text(w - 24 + dx, 52 + dy, text=text, font=font, fill="#010101", anchor="e")
+        c.create_text(w - 24, 52, text=text, font=font, fill=self.color, anchor="e")
 
     # Window
 
@@ -655,6 +680,7 @@ class SettingsWindow:
             font_size=self.font_size,
             font_family=self.font_family,
             text_color=self.color,
+            text_outline=self.outline,
             shortcuts=self._current_shortcuts(),
         ))
         self.close()

@@ -36,7 +36,7 @@ Bump `VERSION` (semver, no `v`) and push to `main`. CI builds both platforms and
 
 ## Gotchas
 
-- Windows overlay transparency uses `-transparentcolor` with `KEY_COLOR`; hidden means "draw nothing", never `withdraw()` (keeps the window from stealing focus).
+- Windows overlay transparency uses `-transparentcolor` with `KEY_COLOR` (near-black, which gives smooth text a thin dark edge; with "Dark outline" off, `overlay.key_color` uses the text color off by one instead); hidden means "draw nothing", never `withdraw()` (keeps the window from stealing focus).
 - macOS needs Screen Recording and Accessibility permissions; without them screenshots show only the wallpaper and shortcuts do nothing, with no error.
 - `ImageGrab.grab(all_screens=True)` only covers all monitors on Windows; macOS captures the main display.
 - Other windows can push a topmost window down, so `App._keep_on_top` re-raises the overlay every 250 ms, after every redraw and while dragging (`SWP_NOACTIVATE`, never steals focus). This keeps it above the Windows taskbar too.

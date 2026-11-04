@@ -46,7 +46,7 @@ Screen Intel is a few small modules wired together by `main.py`.
 
 `settings.load()` merges, highest priority first:
 
-1. Environment variables `GEMINI_API_KEY` / `GOOGLE_API_KEY`, `GEMINI_MODEL`, `FONT_SIZE`, `FONT_FAMILY`, `TEXT_COLOR`, `ONBOARDED`
+1. Environment variables `GEMINI_API_KEY` / `GOOGLE_API_KEY`, `GEMINI_MODEL`, `FONT_SIZE`, `FONT_FAMILY`, `TEXT_COLOR`, `TEXT_OUTLINE`, `ONBOARDED`
 2. The API key from the OS credential store via `keyring` (Windows Credential Manager / macOS Keychain, service `ScreenIntel`). `save()` writes the key there and leaves it blank in the file; `load()` moves a key left in the file by an older version into the store. Without a store the key stays in the file. On macOS the settings folder and file are chmod 700 / 600.
 3. Per-user file written by the Settings window: `%APPDATA%\ScreenIntel\.env` or `~/Library/Application Support/ScreenIntel/.env`
 4. `.env` next to the executable (or next to `main.py` when run from source)
