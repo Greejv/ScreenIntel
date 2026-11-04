@@ -72,23 +72,75 @@ A lens icon appears in the system tray (bottom-right, you may need to click `^`)
 
 ### 🍎 macOS (Apple Silicon: M1, M2, M3, M4 and newer)
 
-1. Open the [**latest release**](https://github.com/Greejv/ScreenIntel/releases/latest) and download **`ScreenIntel-mac.zip`**.
-2. Double-click the zip, then drag **`ScreenIntel.app`** into your **Applications** folder.
-3. Open it once. macOS will say it **can't be verified** because the app isn't signed by Apple. Click **Done** (or **Cancel**), then go to **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to ScreenIntel, then **Open Anyway** again and enter your password. You only do this once.
-   <details><summary>Alternative: one Terminal command</summary>
+Setting up on a Mac takes about 3 minutes and you only do it once. Because ScreenIntel is a free app that isn't signed by Apple, macOS blocks it the first time, and it needs two or three permissions before it can see the screen and hear the shortcuts. Follow the steps in order.
 
-   ```bash
-   xattr -dr com.apple.quarantine /Applications/ScreenIntel.app
-   ```
-   This removes the "downloaded from the internet" flag, so macOS opens it without asking.
-   </details>
-4. The **welcome tour** opens. Paste your API key when it asks. It also has buttons that open the two permission pages:
-5. Give it two permissions in **System Settings** → **Privacy & Security**:
-   - **Screen Recording** → turn on **ScreenIntel** (so it can see the question)
-   - **Accessibility** → turn on **ScreenIntel** (so the shortcuts work)
-6. **Quit and reopen** the app so the permissions take effect.
+> [!NOTE]
+> The pictures below are simple drawings to show you where to click. Your Mac may look slightly different depending on your macOS version, but the names of the buttons are the same.
+
+#### Part A: Download
+
+1. Open the [**latest release**](https://github.com/Greejv/ScreenIntel/releases/latest) and download **`ScreenIntel-mac.zip`**.
+2. Open your **Downloads** folder and double-click **`ScreenIntel-mac.zip`**. A **`ScreenIntel`** app appears next to it.
+3. Drag **`ScreenIntel`** into your **Applications** folder (in the Finder sidebar).
+
+#### Part B: Get past the "can't be verified" popup
+
+4. Open **Applications** and double-click **ScreenIntel**. macOS shows a popup saying it **could not verify** the app. This is expected. Click **Done** (on older macOS it says **Cancel** or **OK**). Do **not** click **Move to Trash**.
+
+   <img src="docs/images/mac-1-not-opened.svg" alt="Popup: ScreenIntel Not Opened. Click Done, not Move to Trash." width="420">
+
+5. Open **System Settings** (click the Apple menu in the top-left corner → **System Settings**) and click **Privacy & Security** in the left sidebar.
+6. Scroll **all the way down** to the **Security** section. You'll see **"ScreenIntel" was blocked to protect your Mac.** Click **Open Anyway**.
+
+   <img src="docs/images/mac-2-open-anyway.svg" alt="System Settings, Privacy and Security: click Open Anyway next to the ScreenIntel message." width="620">
+
+7. A new popup appears. Click **Open Anyway** again and enter your Mac password (or use Touch ID). ScreenIntel now opens, and from now on it opens normally.
+
+> [!TIP]
+> **On macOS 14 Sonoma or older** there's a shortcut: in **Applications**, **right-click** (or `Control`-click) **ScreenIntel**, choose **Open**, then click **Open** in the popup. On macOS 15 Sequoia and newer this no longer works, so use steps 5 to 7.
+
+<details><summary>Still blocked? Use one Terminal command instead</summary>
+
+Open **Terminal** (press `Cmd` + `Space`, type `Terminal`, press Enter), paste this line and press Enter:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/ScreenIntel.app
+```
+
+This removes the "downloaded from the internet" flag, so macOS opens the app without asking. Then double-click ScreenIntel again.
+</details>
+
+#### Part C: Add your API key
+
+8. The **welcome tour** opens. Click through it and paste your API key from [Step 1](#-step-1-get-your-free-gemini-api-key) when it asks. Its **Open settings** buttons take you straight to the permission pages below.
+
+#### Part D: Allow the permissions
+
+ScreenIntel needs permission to **see your screen** (to read the question) and to **listen for its shortcuts**. All three switches are in **System Settings → Privacy & Security**. macOS may also pop up a request for some of them on its own the first time you press a shortcut; if it does, click **Open System Settings** and continue below.
+
+9. **Screen Recording** (so it can see the question): in **Privacy & Security**, click **Screen & System Audio Recording** (called **Screen Recording** on older macOS) and turn on **ScreenIntel**. If macOS asks to **Quit & Reopen**, click **Later**; you'll restart the app at the end.
+
+   <img src="docs/images/mac-3-screen-recording.svg" alt="Screen and System Audio Recording: turn on the switch next to ScreenIntel." width="620">
+
+10. **Accessibility** (so the shortcuts work): go back to **Privacy & Security**, click **Accessibility** and turn on **ScreenIntel**.
+
+    <img src="docs/images/mac-4-accessibility.svg" alt="Accessibility: turn on the switch next to ScreenIntel." width="620">
+
+11. **Input Monitoring** (also for the shortcuts): go back to **Privacy & Security**, click **Input Monitoring** and turn on **ScreenIntel**. If ScreenIntel isn't listed there, that's fine on your macOS version; skip this step.
+
+    <img src="docs/images/mac-5-input-monitoring.svg" alt="Input Monitoring: turn on the switch next to ScreenIntel." width="620">
+
+> [!TIP]
+> **ScreenIntel isn't in the list?** Click the **+** button under the list, open **Applications**, select **ScreenIntel** and click **Open**. Then turn its switch on.
+
+#### Part E: Restart and test
+
+12. **Quit ScreenIntel** (`⌃` + `⌥` + `X`, that's Control + Option + X, or menu bar icon → **Quit Screen Intel**) and **open it again** from Applications. Permissions only take effect after a restart.
+13. You'll see **"Ready. ⌃⌥Q to answer."** in the top-left corner. Open a quiz and press **`⌃` + `⌥` + `Q`** (Control + Option + Q) to test it. 🎉
 
 Screen Intel puts a **lens icon in the menu bar** (top right). Click it for **Show / hide answer**, **Settings…**, **Welcome tour**, **Restart** and **Quit**. Clicking the Dock icon or `Cmd` + `,` also opens Settings. Turn it off with `⌃` + `⌥` + `X`, from the menu bar icon, or with `Cmd` + `Q`.
+
+If the shortcut does nothing or the answer is about the wrong thing, see [Troubleshooting](#%EF%B8%8F-troubleshooting). Apple's own guides with real screenshots: [open an app from an unknown developer](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac), [allow screen recording](https://support.apple.com/guide/mac-help/control-access-screen-system-audio-recording-mchld6aa7d23/mac), [allow accessibility apps](https://support.apple.com/guide/mac-help/allow-accessibility-apps-to-access-your-mac-mh43185/mac).
 
 ---
 
