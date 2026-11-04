@@ -1,11 +1,11 @@
 # Architecture
 
-Screen Intel is four small modules wired together by `main.py`.
+Screen Intel is a few small modules wired together by `main.py`.
 
 ```
  keyboard ──► hotkeys.py ──┐
                            │  App.events (queue.Queue)
- tray icon (Windows) ──────┼──────────────► main.App._poll()  (tk main thread, every 50 ms)
+ tray / menu bar icon ─────┼──────────────► main.App._poll()  (tk main thread, every 50 ms)
                            │                     │
  Gemini worker thread ─────┘                     ├─► overlay.Overlay   (draws the answer)
         ▲                                        │
@@ -16,11 +16,13 @@ Screen Intel is four small modules wired together by `main.py`.
 
 | File | Responsibility | Depends on |
 |---|---|---|
-| `main.py` | App lifecycle: load or ask for the API key, create the overlay, start shortcuts and tray, route events, take screenshots, run the Gemini call on a worker thread. | all modules below |
+| `main.py` | App lifecycle: show the welcome tour on first launch, create the overlay, start shortcuts and the tray icon (Windows, pystray) or menu bar icon (macOS, `MacMenuBarIcon` via AppKit, which pynput already pulls in), route events, take screenshots, run the Gemini call on a worker thread. | all modules below |
 | `ai.py` | The prompt and the Gemini call. JPEG-encodes the image, retries on 503/429 with backoff, returns a stripped string (`"?"` if empty). | `google-genai`, Pillow |
-| `hotkeys.py` | Global shortcuts. `WindowsHotkeys` uses Win32 `RegisterHotKey` on its own message-loop thread (no keyboard hook, so antivirus doesn't flag it). `MacHotkeys` uses `pynput.GlobalHotKeys`. `HotkeyListener` picks one per platform. | ctypes / pynput |
-| `settings.py` | Where settings live (`load`, `save`, per-user file path) and the Settings window (API key, model, text size, shortcuts). `ACTIONS` lists every shortcut action with its default. Opened from the Windows tray, or the macOS app menu / Dock icon. | tkinter, python-dotenv |
-| `overlay.py` | Borderless, topmost, transparent tk window showing white text in the system UI font (Segoe UI Variable on Windows 11, SF Pro on macOS). Drag by the text, font size steps, show/hide. Windows: `WS_EX_NOACTIVATE` + `WS_EX_TOOLWINDOW`, so it never takes focus and has no taskbar button. | tkinter |
+| `hotkeys.py` | Global shortcuts. `WindowsHotkeys` uses Win32 `RegisterHotKey` on its own message-loop thread (no keyboard hook, so antivirus doesn't flag it). `MacHotkeys` uses a `pynput.keyboard.Listener` and matches keys by position (`mac_key_name`), because Option changes the typed character (Option+Q is "œ"). `HotkeyListener` picks one per platform. | ctypes / pynput |
+| `settings.py` | Where settings live (`load`, `save`, per-user file path) and the Settings window (sidebar pages General, Appearance, Shortcuts, Background). `ACTIONS` lists every shortcut action with its default for this platform (`WINDOWS_DEFAULTS` / `MAC_DEFAULTS`). Opened from the tray / menu bar icon, or the macOS app menu / Dock icon. | tkinter, python-dotenv, `ui`, `overlay` (font list) |
+| `welcome.py` | The first-launch tour: animated step screens (welcome, how it works, API key, macOS permissions, shortcuts, where the app lives). Calls back with the key; `main` saves it with `ONBOARDED=1`. | tkinter, `ui`, `settings` |
+| `ui.py` | The shared look of Settings and the tour: dark theme colors, rounded `Button`, cards, `animate`/`fade_in`, the app icon (drawn with Pillow, also used for the tray), `bring_to_front`, and `pick_screen_color` (freezes the main screen, shows a magnifier, returns the clicked pixel). Plain tk widgets, because ttk ignores colors on macOS. | tkinter, Pillow |
+| `overlay.py` | Borderless, topmost, transparent tk window showing the answer in the chosen font and color (default: white, system UI font, i.e. Segoe UI Variable on Windows 11 and SF Pro on macOS). `FONT_CHOICES` lists the extra fonts offered in Settings. Drag by the text, font size steps, show/hide. Windows: `WS_EX_NOACTIVATE` + `WS_EX_TOOLWINDOW`, so it never takes focus and has no taskbar button. | tkinter |
 
 ## Flow of one answer
 
@@ -44,11 +46,11 @@ Screen Intel is four small modules wired together by `main.py`.
 
 `settings.load()` merges, highest priority first:
 
-1. Environment variables `GEMINI_API_KEY` / `GOOGLE_API_KEY`, `GEMINI_MODEL`, `FONT_SIZE`
+1. Environment variables `GEMINI_API_KEY` / `GOOGLE_API_KEY`, `GEMINI_MODEL`, `FONT_SIZE`, `FONT_FAMILY`, `TEXT_COLOR`, `ONBOARDED`
 2. Per-user file written by the Settings window: `%APPDATA%\ScreenIntel\.env` or `~/Library/Application Support/ScreenIntel/.env`
 3. `.env` next to the executable (or next to `main.py` when run from source)
 
-With no key, the app starts anyway, shows a hint on the overlay and opens the Settings window. Saving applies immediately (`App._apply_settings` rebuilds the `Answerer`, resizes the text and re-registers changed shortcuts). Shortcuts are recorded by pressing them (`settings.ShortcutField` decodes tk key events with `hotkeys.mods_from_state` / `key_from_event`), checked against `hotkeys.SYSTEM_SHORTCUTS` and, on Windows, `hotkeys.is_free` (a test `RegisterHotKey`). The app pauses its own shortcuts while Settings is open and re-registers them when it closes. They are stored as `SHORTCUT_<ACTION>=ctrl+shift+q` in canonical modifier order (ctrl, shift, alt, win); if a hand-edited file has an invalid or duplicate one, all shortcuts fall back to the defaults. The placeholder value from `.env.example` is treated as "no key".
+On first launch (no `ONBOARDED=1`) the welcome tour opens. Later, with no key, the app starts anyway, shows a hint on the overlay and opens the Settings window. Saving applies immediately (`App._apply_settings` rebuilds the `Answerer`, resizes the text and re-registers changed shortcuts). Shortcuts are recorded by pressing them (`settings.ShortcutField` decodes tk key events with `hotkeys.mods_from_state` / `key_from_event`), checked against `hotkeys.SYSTEM_SHORTCUTS` and, on Windows, `hotkeys.is_free` (a test `RegisterHotKey`). The app pauses its own shortcuts while Settings is open and re-registers them when it closes. They are stored as `SHORTCUT_<ACTION>=ctrl+shift+q` in canonical modifier order (ctrl, shift, alt, win); if a hand-edited file has an invalid or duplicate one, all shortcuts fall back to the defaults. The placeholder value from `.env.example` is treated as "no key".
 
 ## Build and release
 

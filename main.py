@@ -10,10 +10,12 @@ from pathlib import Path
 
 from PIL import ImageGrab
 
+import overlay
 import settings
+import ui
 from ai import Answerer
 from hotkeys import HotkeyListener
-from overlay import Overlay
+from welcome import WelcomeWindow
 
 IS_MAC = sys.platform == "darwin"
 CAPTURE_MODES = {  # shortcut action -> ai.PROMPTS mode
@@ -26,19 +28,77 @@ HIDE_DELAY_MS = 150  # let the overlay disappear before the screenshot is taken
 KEEP_ON_TOP_MS = 250  # the taskbar and other topmost windows can cover the overlay; re-raise it this often
 
 
-def make_tray(on_toggle, on_settings, on_quit):
-    """Windows tray icon. macOS has no tray here: Settings and Quit live in the app menu and Dock."""
-    import pystray
-    from PIL import Image, ImageDraw
+# Menu of the tray icon (Windows) and menu bar icon (macOS): (title, event), None = separator.
+MENU = (
+    ("Show / hide answer", "toggle"), ("Settings…", "settings"), ("Welcome tour", "welcome"), None,
+    ("Restart", "restart"), ("Quit Screen Intel", "quit"),
+)
 
-    img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
-    ImageDraw.Draw(img).ellipse((4, 4, 60, 60), fill=(40, 120, 255, 255))
-    menu = pystray.Menu(
-        pystray.MenuItem("Show / hide", on_toggle, default=True),
-        pystray.MenuItem("Settings...", on_settings),
-        pystray.MenuItem("Quit", on_quit),
-    )
-    return pystray.Icon("ScreenIntel", img, "Screen Intel", menu)
+
+def make_tray(put, tooltip):
+    """Windows tray icon; clicking it shows or hides the answer. Runs on pystray's own thread."""
+    import pystray
+
+    def action(event):
+        return lambda: put(event)  # pystray rejects callbacks with extra (default) arguments
+
+    items = [
+        pystray.Menu.SEPARATOR if item is None
+        else pystray.MenuItem(item[0], action(item[1]), default=item[1] == "toggle")
+        for item in MENU
+    ]
+    return pystray.Icon("ScreenIntel", ui.app_icon(64), tooltip, pystray.Menu(*items))
+
+
+class MacMenuBarIcon:
+    """macOS menu bar icon with the same menu as the Windows tray, built with AppKit (comes with pynput).
+
+    tk already runs the macOS event loop on the main thread, so the menu's callbacks arrive there.
+    If anything goes wrong it simply doesn't appear; the Dock icon and app menu still work.
+    """
+
+    def __init__(self, put, header):
+        import AppKit
+        from Foundation import NSObject
+
+        events = {}
+
+        class ScreenIntelMenuTarget(NSObject):
+            def clicked_(self, sender):  # the menu items' action, "clicked:"
+                put(events[sender.tag()])
+
+        self._target = ScreenIntelMenuTarget.alloc().init()
+        self._bar = AppKit.NSStatusBar.systemStatusBar()
+        self._item = self._bar.statusItemWithLength_(AppKit.NSVariableStatusItemLength)
+        button = self._item.button()
+        symbol = getattr(AppKit.NSImage, "imageWithSystemSymbolName_accessibilityDescription_", None)
+        image = symbol("text.viewfinder", "Screen Intel") if symbol else None  # macOS 11+
+        if image:
+            image.setTemplate_(True)  # follows the light/dark menu bar
+            button.setImage_(image)
+        else:
+            button.setTitle_("SI")
+        button.setToolTip_("Screen Intel")
+
+        menu = AppKit.NSMenu.alloc().init()
+        menu.setAutoenablesItems_(False)
+        title = AppKit.NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(header, None, "")
+        title.setEnabled_(False)
+        menu.addItem_(title)
+        menu.addItem_(AppKit.NSMenuItem.separatorItem())
+        for tag, item in enumerate(MENU):
+            if item is None:
+                menu.addItem_(AppKit.NSMenuItem.separatorItem())
+                continue
+            entry = AppKit.NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(item[0], "clicked:", "")
+            entry.setTarget_(self._target)
+            entry.setTag_(tag)
+            events[tag] = item[1]
+            menu.addItem_(entry)
+        self._item.setMenu_(menu)
+
+    def stop(self):
+        self._bar.removeStatusItem_(self._item)
 
 
 class App:
@@ -49,29 +109,35 @@ class App:
         self.settings = settings.load()
         self.answerer = self._make_answerer()
         self.settings_window = None
+        self.welcome_window = None
 
         self.root = tk.Tk()
         self.root.report_callback_exception = self._on_tk_error
-        self.overlay = Overlay(self.root, font_size=self.settings["font_size"])
+        s = self.settings
+        self.overlay = overlay.Overlay(self.root, s["font_size"], s["font_family"], s["text_color"])
 
         self.hotkeys = None
         self._start_hotkeys()
 
         self.tray = None
+        put = lambda event: self.events.put((event, None))  # noqa: E731
+        header = f"Screen Intel · {settings.shortcut_label(s['shortcuts']['capture'])} to answer"
         if IS_MAC:
             self.root.createcommand("tk::mac::Quit", self.quit)
             self.root.createcommand("tk::mac::ShowPreferences", self.open_settings)  # app menu, Cmd+,
             self.root.createcommand("tk::mac::ReopenApplication", self.open_settings)  # Dock icon click
+            try:
+                self.tray = MacMenuBarIcon(put, header)
+            except Exception:  # no AppKit or an old macOS: Dock icon and app menu still work
+                self.tray = None
         else:
-            self.tray = make_tray(
-                lambda: self.events.put(("toggle", None)),
-                lambda: self.events.put(("settings", None)),
-                lambda: self.events.put(("quit", None)),
-            )
+            self.tray = make_tray(put, header)
             self.tray.run_detached()
 
         self.overlay.set_text(self._status_message())
-        if not self.answerer:
+        if not s["onboarded"]:
+            self.open_welcome()
+        elif not self.answerer:
             self.open_settings()
 
         quit_after = os.getenv("SCREENINTEL_QUIT_AFTER_MS")  # used by CI to test a clean shutdown
@@ -107,7 +173,7 @@ class App:
 
     def _status_message(self):
         if not self.answerer:
-            where = "the app menu" if IS_MAC else "the tray icon"
+            where = "the menu bar icon" if IS_MAC else "the tray icon"
             return f"No Gemini API key. Open Settings from {where}."
         if self.hotkeys and self.hotkeys.failed:
             used = ", ".join(settings.shortcut_label(c) for c in self.hotkeys.failed)
@@ -142,6 +208,22 @@ class App:
             self.restart()
         elif name == "settings":
             self.open_settings()
+        elif name == "welcome":
+            self.open_welcome()
+
+    def open_welcome(self):
+        if self.welcome_window and self.welcome_window.win.winfo_exists():
+            ui.bring_to_front(self.welcome_window.win)
+            return
+        self.welcome_window = WelcomeWindow(self.root, self.settings, self._welcome_finished)
+
+    def _welcome_finished(self, key):
+        new = dict(self.settings, onboarded=True, api_key=key or self.settings["api_key"])
+        settings.save(new)
+        self.settings = new
+        self.answerer = self._make_answerer()
+        self.overlay.set_text(self._status_message())
+        self.overlay.set_visible(True)
 
     def open_settings(self):
         if self.settings_window and self.settings_window.is_open():
@@ -149,8 +231,9 @@ class App:
             return
         # Pause our shortcuts so pressing them in Settings records them (and they don't count as taken).
         self._stop_hotkeys()
+        actions = {"welcome": self.open_welcome, "restart": self.restart, "quit": self.quit}
         self.settings_window = settings.SettingsWindow(
-            self.root, self.settings, self._apply_settings, self._settings_closed
+            self.root, self.settings, self._apply_settings, self._settings_closed, actions
         )
 
     def _settings_closed(self):
@@ -164,6 +247,10 @@ class App:
         self.settings = new  # shortcuts are re-registered when the window closes
         self.answerer = self._make_answerer()
         self.overlay.set_font_size(new["font_size"])
+        self.overlay.set_style(new["font_family"], new["text_color"])
+        if self.tray and not IS_MAC:
+            capture = settings.shortcut_label(new["shortcuts"]["capture"])
+            self.tray.title = f"Screen Intel · {capture} to answer"
         self.overlay.set_text("Settings saved. " + self._status_message())
         self.overlay.set_visible(True)
 

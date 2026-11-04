@@ -15,7 +15,7 @@ What's planned next, roughly in priority order. Open an issue to discuss anythin
 - [x] **Customizable shortcuts** in the Settings window (v1.3.0).
 - [ ] **Faster startup on Windows**: ship a `--onedir` zip alongside the one-file exe.
 - [ ] **Monitor choice**: capture only the monitor under the mouse to send smaller images and get faster answers.
-- [ ] **Menu bar icon on macOS** (needs a tray library that coexists with tk's main loop).
+- [x] **Menu bar icon on macOS** via AppKit, plus a first-launch welcome tour, a redesigned Settings window, answer fonts and colors with an on-screen color picker, and Mac shortcuts that avoid macOS ones (v1.6.0).
 
 ## Later: bigger features
 

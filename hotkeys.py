@@ -11,8 +11,21 @@ MOD_ALT, MOD_CONTROL, MOD_SHIFT, MOD_WIN, MOD_NOREPEAT = 0x1, 0x2, 0x4, 0x8, 0x4
 WM_HOTKEY, WM_QUIT = 0x0312, 0x0012
 
 _MODS = {"ctrl": MOD_CONTROL, "shift": MOD_SHIFT, "alt": MOD_ALT, "win": MOD_WIN}
-_KEYS = {"up": 0x26, "down": 0x28, "left": 0x25, "right": 0x27, "space": 0x20}
+_KEYS = {"up": 0x26, "down": 0x28, "left": 0x25, "right": 0x27, "space": 0x20, "=": 0xBB, "-": 0xBD}
 _KEYS.update({f"f{n}": 0x6F + n for n in range(1, 13)})  # F1..F12
+
+# macOS virtual key codes (key positions on a US layout). Used when a modifier such as Option changes the
+# character a key types (Option+Q types "œ"), so shortcuts are matched by key, not by character.
+_MAC_VK = {k: vk for vk, k in enumerate("asdfhgzxcv")}
+_MAC_VK.update({
+    "b": 0x0B, "q": 0x0C, "w": 0x0D, "e": 0x0E, "r": 0x0F, "y": 0x10, "t": 0x11, "1": 0x12, "2": 0x13,
+    "3": 0x14, "4": 0x15, "6": 0x16, "5": 0x17, "=": 0x18, "9": 0x19, "7": 0x1A, "-": 0x1B, "8": 0x1C,
+    "0": 0x1D, "o": 0x1F, "u": 0x20, "i": 0x22, "p": 0x23, "l": 0x25, "j": 0x26, "k": 0x28, "n": 0x2D,
+    "m": 0x2E, "space": 0x31, "left": 0x7B, "right": 0x7C, "down": 0x7D, "up": 0x7E,
+    "f1": 0x7A, "f2": 0x78, "f3": 0x63, "f4": 0x76, "f5": 0x60, "f6": 0x61, "f7": 0x62, "f8": 0x64,
+    "f9": 0x65, "f10": 0x6D, "f11": 0x67, "f12": 0x6F,
+})
+_MAC_VK_TO_KEY = {vk: k for k, vk in _MAC_VK.items()}
 
 
 def parse(combo):
@@ -58,8 +71,17 @@ _MAC_SYSTEM = {
     "win+shift+5": "Screenshot tools", "ctrl+win+q": "Lock screen", "ctrl+win+f": "Full screen",
     "ctrl+win+space": "Emoji picker", "ctrl+space": "Switch input source", "ctrl+up": "Mission Control",
     "ctrl+down": "App windows", "ctrl+left": "Previous desktop", "ctrl+right": "Next desktop",
-    "alt+win+d": "Show / hide Dock",
+    "alt+win+d": "Show / hide Dock", "win+shift+q": "Log out", "alt+win+h": "Hide others",
+    "alt+win+m": "Minimize all", "ctrl+win+d": "Look up", "alt+win+space": "Finder search",
+    "win+shift+g": "Go to folder", "win+g": "Find next", "win+e": "Use selection for Find",
+    "win+b": "Bold", "win+i": "Italic", "win+u": "Underline", "win+l": "Address bar", "win+k": "Insert link",
+    "win+y": "Quick Look", "win+d": "Bookmark / Don't save", "win+shift+6": "Touch Bar screenshot",
+    "ctrl+f2": "Focus menu bar", "ctrl+f3": "Focus Dock", "win+=": "Zoom in", "win+-": "Zoom out",
+    "alt+win+=": "Zoom in (Accessibility)", "alt+win+-": "Zoom out (Accessibility)",
 }
+# Control+letter moves the cursor in every macOS text field (Control+Shift+letter selects), so leave those.
+_MAC_SYSTEM.update({f"ctrl+{k}": "Text editing" for k in "abdefhklnoptvy"})
+_MAC_SYSTEM.update({f"ctrl+shift+{k}": "Text selection" for k in "abefnp"})
 SYSTEM_SHORTCUTS = _MAC_SYSTEM if sys.platform == "darwin" else _WINDOWS_SYSTEM
 
 
@@ -117,6 +139,9 @@ def mods_from_state(state):
     return mods
 
 
+_KEYSYM_KEYS = {"equal": "=", "plus": "=", "minus": "-", "underscore": "-"}
+
+
 def key_from_event(keysym, keycode):
     """The shortcut key name for a tkinter key event, or None if it can't be used in a shortcut.
 
@@ -128,19 +153,28 @@ def key_from_event(keysym, keycode):
         if 0x30 <= keycode <= 0x39 or 0x41 <= keycode <= 0x5A:
             return chr(keycode).lower()
         return None
-    k = keysym.lower()
-    if k in _KEYS or (len(k) == 1 and k.isalnum()):
+    k = _KEYSYM_KEYS.get(keysym.lower(), keysym.lower())
+    if k in _KEYS or (len(k) == 1 and k.isascii() and k.isalnum()):
         return k
+    if sys.platform == "darwin":
+        # Option changes the keysym (Option+Q is "oe"); Tk 8.6.11+ keeps the key's position in the top byte.
+        return _MAC_VK_TO_KEY.get((keycode >> 24) & 0xFF)
     return None
 
 
-def to_pynput(combo):
-    """'ctrl+shift+up' -> '<ctrl>+<shift>+<up>' (pynput hotkey syntax)."""
-    *mods, key = combo.lower().split("+")
-    names = {"win": "cmd"}
-    parts = [f"<{names.get(m, m)}>" for m in mods]
-    parts.append(f"<{key}>" if key in _KEYS else key)
-    return "+".join(parts)
+def mac_key_name(char, vk):
+    """Shortcut key name for a macOS key press: the typed letter when it is plain, else by key position."""
+    if char and len(char) == 1 and char.isascii() and (char.isalnum() or char in "=-"):
+        return char.lower()
+    return _MAC_VK_TO_KEY.get(vk)
+
+
+def mac_modifier(name):
+    """pynput key name -> our modifier: 'ctrl_l' -> 'ctrl', 'cmd_r' -> 'win', 'alt_gr' -> 'alt'."""
+    for prefix, mod in (("ctrl", "ctrl"), ("shift", "shift"), ("alt", "alt"), ("cmd", "win")):
+        if name.startswith(prefix):
+            return mod
+    return None
 
 
 class WindowsHotkeys(threading.Thread):
@@ -187,14 +221,47 @@ class WindowsHotkeys(threading.Thread):
 
 
 class MacHotkeys:
-    """Needs Accessibility / Input Monitoring permission in System Settings > Privacy & Security."""
+    """Needs Accessibility / Input Monitoring permission in System Settings > Privacy & Security.
+
+    Matches presses by key position (see mac_key_name), so Control+Option+Q works although Option
+    changes the typed character. Holding a shortcut down fires it once.
+    """
 
     def __init__(self, bindings):
         from pynput import keyboard
 
-        self._listener = keyboard.GlobalHotKeys({to_pynput(c): cb for c, cb in bindings.items()})
+        self._bindings = dict(bindings)
+        self._held = set()  # modifiers that are down
+        self._fired = set()  # keys whose shortcut fired and that are still down
+        self._listener = keyboard.Listener(on_press=self._press, on_release=self._release)
         self.ready = threading.Event()
         self.failed = []
+
+    @staticmethod
+    def _key(key):
+        """(modifier or None, key name or None) for a pynput key."""
+        name = getattr(key, "name", None)
+        if name:  # a special key: modifiers, arrows, F-keys, space
+            mod = mac_modifier(name)
+            vk = getattr(getattr(key, "value", None), "vk", None)
+            return mod, None if mod else mac_key_name(None, vk)
+        return None, mac_key_name(getattr(key, "char", None), getattr(key, "vk", None))
+
+    def _press(self, key):
+        mod, name = self._key(key)
+        if mod:
+            self._held.add(mod)
+        elif name and name not in self._fired:
+            callback = self._bindings.get(canonical(self._held, name))
+            if callback:
+                self._fired.add(name)
+                callback()
+
+    def _release(self, key):
+        mod, name = self._key(key)
+        if mod:
+            self._held.discard(mod)
+        self._fired.discard(name)
 
     def start(self):
         self._listener.start()

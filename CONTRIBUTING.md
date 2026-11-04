@@ -25,7 +25,7 @@ pytest -q tests
 
 Both must pass; CI runs them on every push and pull request, then builds and launches the app on Windows and macOS.
 
-If you changed anything visual or platform-specific, also run the app and check by hand:
+If you changed anything visual or platform-specific, also run the app and check by hand (on macOS the shortcuts are `⌃⌥` instead of `Ctrl+Shift`, and `⌃⌥=` / `⌃⌥-` for text size):
 
 - [ ] "Ready" appears in the top-left corner
 - [ ] `Ctrl+Shift+Q` shows `...` and then an answer
@@ -33,14 +33,16 @@ If you changed anything visual or platform-specific, also run the app and check 
 - [ ] `Ctrl+Shift+Up/Down` resizes the text, down to the smallest size without vanishing
 - [ ] `Ctrl+Shift+R` restarts the app (old copy gone, new one shows "Ready")
 - [ ] The text can be dragged, and clicks next to it reach the window behind
-- [ ] Settings opens (tray on Windows, Dock icon / Cmd+, on macOS), and Save applies the key and text size right away
+- [ ] First launch (or tray / menu bar → Welcome tour) shows the tour; Back/Next slide, the key typed there is saved
+- [ ] Settings opens (tray on Windows, menu bar icon / Dock icon / Cmd+, on macOS), and Save applies the key, font, color and text size right away
+- [ ] Appearance → Pick a color from the screen hides Settings, shows the magnifier, and the clicked color is used
 - [ ] In Settings, clicking a shortcut box and pressing e.g. Ctrl+Alt+T records it; Ctrl+C is refused as a system shortcut; the new shortcut works after Save
-- [ ] Quit works: `Ctrl+Shift+X`, tray icon on Windows, Cmd+Q on macOS
+- [ ] Quit works: `Ctrl+Shift+X` (`⌃⌥X` on macOS), tray / menu bar icon, Cmd+Q on macOS
 
 ## Code guidelines
 
 - **Small and plain.** The whole app is a few hundred lines; keep it that way. Standard library + the four dependencies in `requirements.txt`. Ask before adding a dependency.
-- **One job per module.** `ai.py` (Gemini), `hotkeys.py` (shortcuts), `overlay.py` (answer window), `settings.py` (settings file and Settings window), `main.py` (wiring). Don't let GUI code into `ai.py` or Gemini code into the GUI modules.
+- **One job per module.** `ai.py` (Gemini), `hotkeys.py` (shortcuts), `overlay.py` (answer window), `settings.py` (settings file and Settings window), `welcome.py` (first-launch tour), `ui.py` (shared look, animations, screen color picker), `main.py` (wiring). Don't let GUI code into `ai.py` or Gemini code into the GUI modules.
 - **Threads talk through the queue.** Only the tk main thread touches tkinter; other threads put `(name, value)` on `App.events`.
 - **Platform branches** go inside the module that needs them (`if IS_MAC:`), with platform-only imports inside the branch.
 - **Readable names, short functions, comments only where the "why" isn't obvious.** Follow the existing style; `ruff` enforces the basics (line length 110).
