@@ -4,6 +4,7 @@ Both listeners take {"ctrl+shift+q": callback, ...}, call callbacks on a backgro
 thread, expose .ready (Event) and .failed (shortcuts that could not be registered).
 """
 
+import contextlib
 import sys
 import threading
 
@@ -229,17 +230,17 @@ class MacHotkeys:
 
     def __init__(self, bindings):
         from pynput import keyboard
+        from pynput.keyboard import _darwin
 
         self._bindings = dict(bindings)
         self._held = set()  # modifiers that are down
         self._fired = set()  # keys whose shortcut fired and that are still down
-        class Listener(keyboard.Listener):
-            def _run(self):
-                # pynput's own _run first reads the keyboard layout (TSMGetInputSourceProperty) on this
-                # background thread, which macOS 14+ kills the app for. The result is unused, so skip it.
-                super(keyboard.Listener, self)._run()
-
-        self._listener = Listener(on_press=self._press, on_release=self._release)
+        # pynput's Listener reads the keyboard layout (TSMGetInputSourceProperty) when it starts. It does that
+        # on its own thread, which macOS 14+ kills the app for, so read it here on the main thread instead.
+        with _darwin.keycode_context() as layout:
+            pass
+        _darwin.keycode_context = lambda: contextlib.nullcontext(layout)
+        self._listener = keyboard.Listener(on_press=self._press, on_release=self._release)
         self.ready = threading.Event()
         self.failed = []
 

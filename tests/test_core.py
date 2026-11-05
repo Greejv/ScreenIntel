@@ -1,4 +1,5 @@
 import sys
+import threading
 from pathlib import Path
 from unittest import mock
 
@@ -186,27 +187,41 @@ def test_mac_listener_matches_by_key_and_fires_once():
     assert hits == [1, 1]
 
 
-def test_mac_listener_skips_keyboard_layout_lookup(monkeypatch):
-    """pynput's Listener._run reads the keyboard layout off the main thread, which crashes macOS 14+."""
+def test_mac_listener_reads_keyboard_layout_on_the_calling_thread(monkeypatch):
+    """pynput's Listener reads the keyboard layout on its own thread, which crashes macOS 14+."""
+    import contextlib
     import types
 
-    class Mixin:  # stands in for pynput's ListenerMixin, whose _run listens for events
-        def _run(self):
-            self.listened = True
+    reads = []
 
-    class Listener(Mixin):  # stands in for pynput.keyboard.Listener on macOS
+    @contextlib.contextmanager
+    def keycode_context():  # stands in for pynput's layout lookup
+        reads.append(threading.current_thread())
+        yield "layout"
+
+    darwin = types.ModuleType("pynput.keyboard._darwin")
+    darwin.keycode_context = keycode_context
+
+    class Listener:  # stands in for pynput.keyboard.Listener on macOS, whose _run uses keycode_context
         def __init__(self, on_press, on_release):
             pass
 
         def _run(self):
-            raise AssertionError("read the keyboard layout on a background thread")
+            with darwin.keycode_context() as self.layout:
+                pass
 
+    keyboard = types.ModuleType("pynput.keyboard")
+    keyboard.Listener, keyboard._darwin = Listener, darwin
     pynput = types.ModuleType("pynput")
-    pynput.keyboard = types.SimpleNamespace(Listener=Listener)
-    monkeypatch.setitem(sys.modules, "pynput", pynput)
+    pynput.keyboard = keyboard
+    for module in (pynput, keyboard, darwin):
+        monkeypatch.setitem(sys.modules, module.__name__, module)
     listener = hotkeys.MacHotkeys({})._listener
-    listener._run()
-    assert listener.listened
+    thread = threading.Thread(target=listener._run)
+    thread.start()
+    thread.join()
+    assert reads == [threading.main_thread()]
+    assert listener.layout == "layout"
 
 
 class FakeKeyring:
